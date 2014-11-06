@@ -37,11 +37,11 @@ Similar work has been done in [6]. The focus was on non-forwarding elements like
 Description:
 -----------
 
-A ----- 1 ----- 2 ----- 3 ----- B
-        |       |       |
-        |       |       |
-        |       |       |
-        C       E       F
+A ----- 1 ----- 2 ----- 3 ----- B<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;C&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;E&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F<br>
 
 Figure-1
 
@@ -74,63 +74,63 @@ Our implementation of a Content-Centric Routing involes a Centralized Controller
 
 Packet Types:
 ------------
-|-------------------------------------------|
-|      Packet Type   |      Description     |  
-|-------------------------------------------|
-| REGISTRATION_REQ   | Registration Request |
-| REGISTRATION_SUC   | Registration Success |
-| SUBSCRIPTION_REQ   | Subscription Request |
-| SUBSCRIPTION_SUC   | Subscription Success |
-| DATA_PACKET        | Data Packet          |
-| DEREGISTRATION_REQ | Registration Request |
-| DEREGISTRATION_SUC | Registration Success |
-| DESUBSCRIPTION_REQ | Subscription Request |
-| DESUBSCRIPTION_SUC | Subscription Success |
-|-------------------------------------------|
+|-------------------------------------------|<br>
+|      Packet Type   |      Description     |<br> 
+|-------------------------------------------|<br>
+| REGISTRATION_REQ   | Registration Request |<br>
+| REGISTRATION_SUC   | Registration Success |<br>
+| SUBSCRIPTION_REQ   | Subscription Request |<br>
+| SUBSCRIPTION_SUC   | Subscription Success |<br>
+| DATA_PACKET        | Data Packet          |<br>
+| DEREGISTRATION_REQ | Registration Request |<br>
+| DEREGISTRATION_SUC | Registration Success |<br>
+| DESUBSCRIPTION_REQ | Subscription Request |<br>
+| DESUBSCRIPTION_SUC | Subscription Success |<br>
+|-------------------------------------------|<br>
 
-|---------------------------------------------------------------------|
-| Packet Type | Sequence Number | Host Identifier | Length | Keywords |
-|---------------------------------------------------------------------|
+|---------------------------------------------------------------------|<br>
+| Packet Type | Sequence Number | Host Identifier | Length | Keywords |<br>
+|---------------------------------------------------------------------|<br>
 Registration Request Packet
 
-|---------------------------------------------------|
-| Packet Type | Sequence Number | Unique Identifier |
-|---------------------------------------------------|
+|---------------------------------------------------|<br>
+| Packet Type | Sequence Number | Unique Identifier |<br>
+|---------------------------------------------------|<br>
 Registration Success Packet
 
-|---------------------------------------------------------------------|
-| Packet Type | Sequence Number | Host Identifier | Length | Keywords |
-|---------------------------------------------------------------------|
+|---------------------------------------------------------------------|<br>
+| Packet Type | Sequence Number | Host Identifier | Length | Keywords |<br>
+|---------------------------------------------------------------------|<br>
 Subscription Request Packet
 
-|---------------------------------------------------|
-| Packet Type | Sequence Number | Unique Identifier |
-|---------------------------------------------------|
+|---------------------------------------------------|<br>
+| Packet Type | Sequence Number | Unique Identifier |<br>
+|---------------------------------------------------|<br>
 Subscription Success Packet
 
-|------------------------------------------------------------|
-| Packet Type | Unique Identifier | Payload Length | Payload | 
-|------------------------------------------------------------|
+|------------------------------------------------------------|<br>
+| Packet Type | Unique Identifier | Payload Length | Payload |<br>
+|------------------------------------------------------------|<br>
 Data Packet
 
-|---------------------------------------------------------------------|
-| Packet Type | Sequence Number | Host Identifier | Length | Keywords |
-|---------------------------------------------------------------------|
+|---------------------------------------------------------------------|<br>
+| Packet Type | Sequence Number | Host Identifier | Length | Keywords |<br>
+|---------------------------------------------------------------------|<br>
 Desubscription Request Packet
 
-|---------------------------------------------------|
-| Packet Type | Sequence Number | Unique Identifier |
-|---------------------------------------------------|
+|---------------------------------------------------|<br>
+| Packet Type | Sequence Number | Unique Identifier |<br>
+|---------------------------------------------------|<br>
 Desubscription Success Packet
 
-|---------------------------------------------------------------------|
-| Packet Type | Sequence Number | Host Identifier | Length | Keywords |
-|---------------------------------------------------------------------|
+|---------------------------------------------------------------------|<br>
+| Packet Type | Sequence Number | Host Identifier | Length | Keywords |<br>
+|---------------------------------------------------------------------|<br>
 Deregistration Request Packet
 
-|---------------------------------------------------|
-| Packet Type | Sequence Number | Unique Identifier |
-|---------------------------------------------------|
+|---------------------------------------------------|<br>
+| Packet Type | Sequence Number | Unique Identifier |<br>
+|---------------------------------------------------|<br>
 Deregistration Success Packet
 
 In the first phase, the host creates a registration request with the keywords for the data it is registering for along with a host identifier as defined in the figure above. This request is sent to the switch which the host is connected to. The switch then looks at the type of packet and if the packet type is a registration request packet it forwards it to the connected controller. The controller looks at the Keywords and then creates a unique identfier for the set of keywords and then creates a mapping of the unique identifier with the host Identifier to know what all hosts are the publishers of the information. If the host entry already exists for the keywords, the request is discarded by the controller. Or else, the controller responds back to the host with the registration success message as in the figure above. 
@@ -157,11 +157,19 @@ References:
 ----------
 
 [1] N. McKeown, T. Anderson, H. Balakrishnan, G. Parulkar, L. Peterson, J. Rexford, S. Shenker, and J. Turner, “Openflow: enabling innovation in campus networks,” in SIGCOMM Comput. Commun. Rev., 2008.
+
 [2] Jacobson, Van, Diana K. Smetters, James D. Thornton, Michael F. Plass, Nicholas H. Briggs, and Rebecca L. Braynard. "Networking named content." In Proceedings of the 5th international conference on Emerging networking experiments and technologies, pp. 1-12. ACM, 2009.ch
+
 [3] Salsano, Stefano, Nicola Blefari-Melazzi, Andrea Detti, Giacomo Morabito, and Luca Veltri. "Information centric networking over SDN and OpenFlow: Architectural aspects and experiments on the OFELIA testbed." Computer Networks 57, no. 16 (2013): 3207-3221.
+
 [4] A. Chanda and C. Westphal. "Content as a Network Primitive". In arXiv:1212.3341[cs.NI].
+
 [5] A. Chanda, C. Westphal, and D. Raychaudhuri. "Content based traffic engineering in software defined information centric networks". NOMEN'13. IEEE, 2013.
+
 [6] Chanda, Abhishek, and Cedric Westphal. "A content management layer for software-defined information centric networks." Proceedings of the 3rd ACM SIGCOMM workshop on Information-centric networking. ACM, 2013.
+
 [7] Project CCNx. http://www.ccnx.org, Sep. 2009.
+
 [8] Trossen, Dirk, Mikko Sarela, and Karen Sollins. "Arguments for an information-centric internetworking architecture." ACM SIGCOMM Computer Communication Review 40.2 (2010): 26-33.
+
 [9] Banavar, Guruduth, Tushar Chandra, Bodhi Mukherjee, Jay Nagarajarao, Robert E. Strom, and Daniel C. Sturman. "An efficient multicast protocol for content-based publish-subscribe systems." In Distributed Computing Systems, 1999. Proceedings. 19th IEEE International Conference on, pp. 262-272. IEEE, 1999.
