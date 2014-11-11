@@ -5,7 +5,7 @@
 /*
  * Packet Types
  */
-enum class PacketType: int {
+enum class PacketType: unsigned short {
   REGISTRATION_REQ = 0xC0,
   REGISTRATION_ACK = 0xC1,
   REGISTRATION_NACK = 0xC2,
@@ -18,14 +18,24 @@ enum class PacketType: int {
   DESUBSCRIPTION_REQ = 0xC9,
   DESUBSCRIPTION_ACK = 0xCA,
   DESUBSCRIPTION_NACK = 0xCB,
-  DATA = 0xCC,
+  HELLO = 0xCC,
+  DATA = 0xCD,
+  NETWORK_UPDATE = 0xCE,
+};
+/*
+ * Type of the update packet sent from Switch to the controller
+ * and controller to switch (rule installation) 
+ */
+enum class UpdateType : unsigned char {
+  ADD = 0xA,
+  DELETE = 0xB,
 };
 
 /*
  * Common Packet header which tells the type of packet
  */
 struct PacketTypeHeader {
-  unsigned short packetType;
+  PacketType packetType;
 };
 
 /*
@@ -35,6 +45,31 @@ struct RequestPacketHeader {
   unsigned int sequenceNo;
   unsigned int hostId;
   unsigned int len;
+};
+
+/*
+ * Structure to update the rules in th switch
+ */
+struct RuleUpdatePacketHeader {
+  UpdateType type;
+  unsigned int uniqueId;
+  unsigned short port;
+};
+
+/*
+ * Structure of the Hello Packet
+ */
+struct HelloPacketHeader {
+  unsigned int nodeId;
+};
+
+/*
+ * Structure of the Network Update packet from switch to Controller
+ */
+struct NetworkUpdatePacketHeader {
+  UpdateType type;
+  unsigned int nodeId;
+  unsigned short port;
 };
 
 /*
@@ -59,6 +94,9 @@ static const int PACKET_HEADER_LEN = sizeof(PacketTypeHeader);
 static const int REQUEST_HEADER_LEN = sizeof(RequestPacketHeader);
 static const int RESPONSE_HEADER_LEN = sizeof(ResponsePacketHeader);
 static const int DATA_HEADER_LEN = sizeof(DataPacketHeader);
+static const int RULE_UPDATE_HEADER_LEN = sizeof(RuleUpdatePacketHeader);
+static const int HELLO_HEADER_LEN = sizeof(HelloPacketHeader);
+static const int NETWORK_UPDATE_HEADER_LEN = sizeof(NetworkUpdatePacketHeader);
 
 #endif 
 
