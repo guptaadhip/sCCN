@@ -48,7 +48,7 @@ struct RequestPacketHeader {
 };
 
 /*
- * Structure to update the rules in th switch
+ * Structure to update the rules in the switch
  */
 struct RuleUpdatePacketHeader {
   UpdateType type;
