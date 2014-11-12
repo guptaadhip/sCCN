@@ -1,8 +1,19 @@
 #pragma once
 #ifndef __NET_H_INCLUDED__
 #define __NET_H_INCLUDED__
+#include <string>
 
 static const int BUFLEN = 1470;
+/*
+ * Task Structure
+ */
+
+struct packet {
+  char packet[BUFLEN];
+  std::string interface;
+  struct packet *next;
+};
+
 /*
  * Packet Types
  */
