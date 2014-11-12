@@ -3,7 +3,7 @@ TARGET   = sccn
 
 CC       = g++
 # compiling flags here
-CFLAGS   = -std=c++11 -Wall -I. -ggdb
+CFLAGS   = -std=c++11 -Wall -I. -pthread -ggdb
 
 LINKER   = g++ -o
 # linking flags here

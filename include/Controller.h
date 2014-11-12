@@ -17,6 +17,11 @@ class Controller {
    */
   unsigned int getId() const;
 
+  /*
+   * Thread to Sniff for interface and packet engine 
+   */
+  void startSniffing(std::string, PacketEngine *packetEngine);
+
  private:
   unsigned int myId_;
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine;

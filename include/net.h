@@ -33,6 +33,8 @@ enum class PacketType: unsigned short {
   HELLO = 0xCC,
   DATA = 0xCD,
   NETWORK_UPDATE = 0xCE,
+  SWITCH_REGISTRATION = 0xCF,
+  SWITCH_REGISTRATION_ACK = 0xD1,
 };
 /*
  * Type of the update packet sent from Switch to the controller
