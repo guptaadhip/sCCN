@@ -13,7 +13,5 @@ void Logger::log(Log logType, std::string function, int line, std::string msg) {
     }
   } else if (logType == Log::WARN) {
     std::cout << "WARN: " << function << "::" << line << ": " << msg << std::endl;
-  } else {
-    std::cout << msg << std::endl;
   }
 }
