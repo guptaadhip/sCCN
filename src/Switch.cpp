@@ -2,6 +2,7 @@
 #include "include/PacketEngine.h"
 #include <iostream>
 #include <string>
+#include <cstring>
 #include "include/Logger.h"
 #include "include/Util.h"
 #include "include/net.h"
