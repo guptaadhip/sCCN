@@ -3,11 +3,11 @@ TARGET   = sccn
 
 CC       = g++
 # compiling flags here
-CFLAGS   = -std=c++11 -Wall -I.
+CFLAGS   = -std=c++11 -Wall -I. -ggdb
 
 LINKER   = g++ -o
 # linking flags here
-LFLAGS   = -Wall -I. -lm
+LFLAGS   = -Wall -I. -lm -ggdb
 
 SRCDIR   = src
 INCLUDEDIR   = include
