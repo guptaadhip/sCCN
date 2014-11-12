@@ -3,11 +3,13 @@
 #include <cstring>
 #include "include/net.h"
 #include "include/Logger.h"
+#include "include/Switch.h"
+#include "include/Controller.h"
 
 extern bool DEBUG_MODE;
 
 int main(int argc, char *argv[]) {
-  int myId;
+  unsigned int myId;
   std::string role;
   if (argc < 3) {
     Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, "too few arguments");
@@ -20,7 +22,17 @@ int main(int argc, char *argv[]) {
   }
   myId = atoi(argv[1]);
   role = argv[2];
-  Logger::log(Log::INFO, __FUNCTION__, __LINE__, "Hello World");
-  Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "This is me");
+  if (role.compare("Switch") == 0) {
+    Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "Role: Switch");
+    Switch mySwitch(myId);
+  } else if (role.compare("Controller") == 0) {
+    Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "Role: Controller");
+    Controller controller(myId);
+  } else if (role.compare("Host") == 0) {
+    Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "Role: Host");
+  } else {
+    Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+                "incorrect role specified");
+  }
   return 0;
 }
