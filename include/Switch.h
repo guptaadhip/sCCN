@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include "include/MyInterfaces.h"
 #include "include/PacketEngine.h"
+#include "include/PacketHandler.h"
 
 class Switch{
  public:
@@ -15,6 +16,7 @@ class Switch{
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine;
   MyInterfaces myInterface_;
   unsigned int switchId_;
+  PacketHandler packetHandler_;
 };
    
     

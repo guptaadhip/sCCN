@@ -8,10 +8,16 @@
 
 class PacketHandler {
  public:
-  void queuePacket(packet *t);
-  void processQueue();
+  /*
+   * Function to queue the Packet Entry
+   */
+  void queuePacket(PacketEntry *t);
+  /*
+   * Function to Process the Packet Entry by Controller
+   */
+  void processQueueController();
  private:
   std::mutex packet_ready_mutex_;
   std::condition_variable packet_ready_;
-  std::atomic<packet*> packet_in_queue_;
+  std::atomic<PacketEntry *> packet_in_queue_;
 };

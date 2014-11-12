@@ -1,6 +1,7 @@
 #include "include/PacketEngine.h"
 #include "include/net.h"
 #include "include/Logger.h"
+#include "include/PacketHandler.h"
 
 #include <sys/socket.h>
 #include <net/if.h>
@@ -15,10 +16,12 @@ using namespace std;
 
 unsigned int bufSize = 33554432;
 
-PacketEngine::PacketEngine(std::string interface, unsigned int id) {
+PacketEngine::PacketEngine(std::string interface, unsigned int id,
+                           PacketHandler *packetHandler) {
    const int on = 1;
    interface_ = interface;
    myId_ = id;
+   packetHandler_ = packetHandler;
 
    /* creating sending socket */
    socketFd_ = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -140,7 +143,8 @@ void PacketEngine::send(char *msg, unsigned int size) {
  * srcId will only be used by the Receiver thread, otherwise 0 to read packets
  * from all sources
  */
-void PacketEngine::receive(char *packet) {
+void PacketEngine::receive(char *packetOld) {
+  char packet[BUFLEN];
   struct sockaddr_ll saddrll;
   socklen_t senderAddrLen;
   int rc;
@@ -149,6 +153,7 @@ void PacketEngine::receive(char *packet) {
    * zeroing the sender's address struct.
    * It will be filled by the recvfrom function.
    */
+  bzero(packet, BUFLEN);
   memset((void*)&saddrll, 0, sizeof(saddrll));
   senderAddrLen = (socklen_t) sizeof(saddrll);
   
@@ -161,7 +166,12 @@ void PacketEngine::receive(char *packet) {
     if (rc < 0 || saddrll.sll_pkttype == PACKET_OUTGOING) {
       continue;
     }
-    
+  	Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
+       					"Got a packet");
+    PacketEntry packetEntry;
+    bcopy(packetEntry.packet, packet, BUFLEN); 
+    packetEntry.interface = interface_;
+    packetHandler_->queuePacket(&packetEntry);
     return;
   }
 }

@@ -21,7 +21,7 @@ Controller::Controller(unsigned int myId) {
 
   /* filling the interface to PacketEngine map */ 
   for(auto &entry : myInterfaces_.getInterfaceList()) {
-    PacketEngine packetEngine(entry, myId);
+    PacketEngine packetEngine(entry, myId, &packetHandler_);
     /* make a pair of interface and packet engine */
     std::pair<std::string, PacketEngine> ifPePair (entry, packetEngine);
     ifToPacketEngine.insert(ifPePair);
@@ -32,7 +32,8 @@ Controller::Controller(unsigned int myId) {
     packetEngineThreads.push_back(std::thread(&Controller::startSniffing, this,
                                   it->first, &it->second));
   }
-  
+
+  packetHandler_.processQueueController();
   /* waiting for all the packet engine threads */
   for (auto& joinThreads : packetEngineThreads) joinThreads.join();
 }

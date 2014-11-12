@@ -2,6 +2,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "PacketHandler.h"
 #include "PacketEngine.h"
 #include "MyInterfaces.h"
 
@@ -26,4 +27,5 @@ class Controller {
   unsigned int myId_;
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine;
   MyInterfaces myInterfaces_;
+  PacketHandler packetHandler_;
 };

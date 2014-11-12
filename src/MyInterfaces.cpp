@@ -13,7 +13,7 @@ MyInterfaces::MyInterfaces() {
   for (ifa = ifAddrStruct_; ifa != NULL; ifa = ifa->ifa_next) {
     std::string interface = std::string(ifa->ifa_name);
     /* dont add loopback interface to the list */
-    if (interface.compare("lo") == 0) {
+    if (interface.compare("lo") == 0 || interface.compare("eth0") == 0) {
       continue;
     }
     interfaces_.push_back(interface);

@@ -8,10 +8,10 @@ static const int BUFLEN = 1470;
  * Task Structure
  */
 
-struct packet {
+struct PacketEntry {
   char packet[BUFLEN];
   std::string interface;
-  struct packet *next;
+  struct PacketEntry *next;
 };
 
 /*

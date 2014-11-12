@@ -4,7 +4,6 @@
 #include <string>
 #include <cstring>
 #include "include/Logger.h"
-#include "include/Util.h"
 #include "include/net.h"
 #include <unistd.h>
 
@@ -15,13 +14,9 @@ Switch::Switch(unsigned int switchId){
   Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
               "Inside Switch constructor");
   for(auto &interface : myInterface_.getInterfaceList()) {
-    PacketEngine packetEngine(interface, switchId);
+    PacketEngine packetEngine(interface, switchId, &packetHandler_);
     std::pair<std::string, PacketEngine> ifPePair (interface, packetEngine); 
     ifToPacketEngine.insert(ifPePair);
-    /*for(auto it = myMap.cbegin(); it != myMap.cend(); ++it)
-    {
-          std::cout << it->first << " " << it->second.first << " " << it->second.second << "\n";
-    }*/
   }
 }
 
