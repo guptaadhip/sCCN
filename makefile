@@ -7,7 +7,7 @@ CFLAGS   = -std=c++11 -Wall -I. -ggdb
 
 LINKER   = g++ -o
 # linking flags here
-LFLAGS   = -Wall -I. -lm -ggdb
+LFLAGS   = -Wall -I. -lm -ggdb -pthread
 
 SRCDIR   = src
 INCLUDEDIR   = include
