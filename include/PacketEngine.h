@@ -30,6 +30,7 @@ class PacketEngine {
   unsigned int getId() const;
 
  private:
+  unsigned int socketFd_;
   void initializeEngine();
   std::string interface_;
   unsigned int myId_;

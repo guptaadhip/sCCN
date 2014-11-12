@@ -2,6 +2,7 @@
 #ifndef __NET_H_INCLUDED__
 #define __NET_H_INCLUDED__
 
+static const int BUFLEN = 1470;
 /*
  * Packet Types
  */

@@ -3,11 +3,11 @@ TARGET   = sccn
 
 CC       = g++
 # compiling flags here
-CFLAGS   = -std=c++11 -Wall -I. -I/usr/local/boost_1_57_0/
+CFLAGS   = -std=c++11 -Wall -I.
 
 LINKER   = g++ -o
 # linking flags here
-LFLAGS   = -Wall -I. -L/usr/local/lib -lm -lboost_system -lboost_thread -lboost_program_options
+LFLAGS   = -Wall -I. -lm
 
 SRCDIR   = src
 INCLUDEDIR   = include

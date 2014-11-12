@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string>
-#include "boost/program_options.hpp"
+#include <cstring>
 #include "include/net.h"
 #include "include/Logger.h"
 
@@ -9,24 +9,18 @@ extern bool DEBUG_MODE;
 int main(int argc, char *argv[]) {
   int myId;
   std::string role;
-  try {
-    namespace po = boost::program_options;
-    po::options_description desc("Options");
-    desc.add_options()
-      ("dbg", "Enable Debug Mode")
-      ("id", po::value<int>(&myId)->required(), "My Id")
-      ("role", po::value<std::string>()->required(), "Role[Controller/Switch/Host]");
-    po::variables_map vm;
-    po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-    role = vm["role"].as<std::string>();
-    if (vm.count("dbg")) {
+  if (argc < 3) {
+    Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, "too few arguments");
+  } else if (argc == 4) {
+    if (strncmp(argv[3], "dbg", strlen(argv[3])) == 0) {
       DEBUG_MODE = true;
-      Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "This is me");
     }
-    Logger::log(Log::INFO, __FUNCTION__, __LINE__, "Hello World");
-  } catch(std::exception& e) {
-    std::cerr << "Unhandled Exception: " << e.what() << std::endl;
-    return 2;
+  } else if (argc > 4) {
+    Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, "too many arguments");
   }
+  myId = atoi(argv[1]);
+  role = argv[2];
+  Logger::log(Log::INFO, __FUNCTION__, __LINE__, "Hello World");
+  Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "This is me");
   return 0;
 }

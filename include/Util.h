@@ -1,6 +1,6 @@
 #pragma once
-#include "boost/random.hpp"
-#include "boost/generator_iterator.hpp"
+#include <boost/random.hpp>
+#include <boost/generator_iterator.hpp>
 #include <limits>
 #include <ctime>
 

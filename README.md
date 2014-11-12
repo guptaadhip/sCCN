@@ -10,6 +10,14 @@ Boost Installation
 ------------------
 http://www.linuxfromscratch.org/blfs/view/svn/general/boost.html
 
+Install
+-------
+1) Boost:
+sudo apt-get install libboost-all-dev
+
+2) G++
+sudo apt-get install g++-4.8
+
 Proposal
 ========
 

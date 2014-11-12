@@ -15,7 +15,7 @@ using namespace std;
 
 unsigned int bufSize = 33554432;
 
-PacketEngine::PacketEngine(std::string interface, unsigned short id) {
+PacketEngine::PacketEngine(std::string interface, unsigned int id) {
    const int on = 1;
    interface_ = interface;
    myId_ = id;
@@ -41,7 +41,7 @@ PacketEngine::PacketEngine(std::string interface, unsigned short id) {
   initializeEngine();
 }
 
-unsigned short PacketEngine::getId() const {
+unsigned int PacketEngine::getId() const {
   return myId_;
 }
 
@@ -141,7 +141,6 @@ void PacketEngine::send(char *msg, unsigned int size) {
  * from all sources
  */
 void PacketEngine::receive(char *packet) {
-  PacketTypeHeader packetTypeHeader;
   struct sockaddr_ll saddrll;
   socklen_t senderAddrLen;
   int rc;
