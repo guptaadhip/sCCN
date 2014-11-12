@@ -25,6 +25,7 @@ int main(int argc, char *argv[]) {
   if (role.compare("Switch") == 0) {
     Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "Role: Switch");
     Switch mySwitch(myId);
+    mySwitch.sendHello();
   } else if (role.compare("Controller") == 0) {
     Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "Role: Controller");
     Controller controller(myId);

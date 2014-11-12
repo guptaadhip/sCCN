@@ -3,7 +3,6 @@
 #include "include/Logger.h"
 
 void PacketHandler::queuePacket(PacketEntry *t) {
-  Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "Entered");
   PacketEntry *stale_head = packet_in_queue_.load(std::memory_order_relaxed);
   do { 
     t->next = stale_head;
@@ -17,7 +16,6 @@ void PacketHandler::queuePacket(PacketEntry *t) {
 }
 
 void PacketHandler::processQueueController() {
-  Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "Entered");
   /* first one needs to be removed */
   (void) packet_in_queue_.exchange(0, std::memory_order_consume);
   while(true) {

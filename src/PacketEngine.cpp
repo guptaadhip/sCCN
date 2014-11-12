@@ -166,8 +166,6 @@ void PacketEngine::receive(char *packetOld) {
     if (rc < 0 || saddrll.sll_pkttype == PACKET_OUTGOING) {
       continue;
     }
-  	Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
-       					"Got a packet");
     PacketEntry packetEntry;
     bcopy(packetEntry.packet, packet, BUFLEN); 
     packetEntry.interface = interface_;
