@@ -9,32 +9,57 @@
 
 using namespace std;
 
-Switch::Switch(unsigned int switchId){
+Switch::Switch(unsigned int switchId) {
+  registered_ = false;
   switchId_ = switchId;
-  Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
-              "Inside Switch constructor");
   for(auto &interface : myInterface_.getInterfaceList()) {
     PacketEngine packetEngine(interface, switchId, &packetHandler_);
     std::pair<std::string, PacketEngine> ifPePair (interface, packetEngine); 
     ifToPacketEngine.insert(ifPePair);
   }
+  /* 
+   * create the switch registration response
+   * handler thread 
+   */
+
+  /*
+   * call the switch registration
+   * until registration the switch should not do anything
+   */
+  sendRegistration();
+
 }
 
 void Switch::sendHello() {
-  char helloPacket[BUFLEN];
-  memset(helloPacket,'\0',BUFLEN);
-  struct HelloPacketHeader helloPac;
-  memset(helloPacket,'\0',BUFLEN);
-  PacketType pacType = PacketType::HELLO;
+  char packet[PACKET_HEADER_LEN + HELLO_HEADER_LEN];
+  bzero(packet, PACKET_HEADER_LEN + HELLO_HEADER_LEN);
+  struct PacketTypeHeader header;
+  header.packetType = PacketType::HELLO;
+  struct HelloPacketHeader helloPacketHeader;
+  helloPacketHeader.nodeId = switchId_;
 
-  helloPac.nodeId=switchId_;
-
-  memcpy(helloPacket, &pacType, sizeof(unsigned short));
-  memcpy(helloPacket + sizeof(unsigned short), &helloPac, sizeof(struct HelloPacketHeader));
+  memcpy(packet, &header, PACKET_HEADER_LEN);
+  memcpy(packet + PACKET_HEADER_LEN, &helloPacketHeader, HELLO_HEADER_LEN);
   for (auto &entry : ifToPacketEngine) {
-    entry.second.send(helloPacket, BUFLEN);
+    entry.second.send(packet, PACKET_HEADER_LEN + HELLO_HEADER_LEN);
+  } 
+}
+
+void Switch::sendRegistration() {
+  while (!registered_) {
+    char packet[PACKET_HEADER_LEN + REGISTRATION_HEADER_LEN];
+    bzero(packet, PACKET_HEADER_LEN + REGISTRATION_HEADER_LEN);
+    struct PacketTypeHeader header;
+    header.packetType = PacketType::SWITCH_REGISTRATION;
+    struct RegistrationPacketHeader regPacketHeader;
+    regPacketHeader.nodeId = switchId_;
+    memcpy(packet, &header, PACKET_HEADER_LEN);
+    memcpy(packet+PACKET_HEADER_LEN, &regPacketHeader, REGISTRATION_HEADER_LEN);
+    for (auto &entry : ifToPacketEngine) {
+      entry.second.send(packet, PACKET_HEADER_LEN + REGISTRATION_HEADER_LEN);
+    }
+    sleep(2);
   }
-  
 }
 
 

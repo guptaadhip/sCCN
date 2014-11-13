@@ -1,3 +1,4 @@
+#! /bin/bash
 # project name (generate executable with this name)
 TARGET   = sccn
 
@@ -23,19 +24,15 @@ rm       = rm -f
 $(BINDIR)/$(TARGET): $(OBJECTS)
 	mkdir -p $(BINDIR)
 	$(LINKER) $@ $(LFLAGS) $(OBJECTS)
-	echo "Linking complete!"
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.cpp
 	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
-	echo "Compiled "$<" successfully!"
 
 clean:
 	$(rm) $(OBJECTS)
 	rmdir $(OBJDIR)
-	echo "Cleanup complete!"
 
 remove: clean
 	$(rm) $(BINDIR)/$(TARGET)
 	rmdir $(BINDIR)
-	echo "Executable removed!"

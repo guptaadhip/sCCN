@@ -62,6 +62,20 @@ struct RequestPacketHeader {
 };
 
 /*
+ * Packet Structure of the Registration Packet
+ */
+struct RegistrationPacketHeader {
+  unsigned int nodeId;
+};
+
+/*
+ * Registration Response Packet Structure
+ */
+struct RegistrationResponsePacketHeader {
+  unsigned int nodeId;
+};
+
+/*
  * Structure to update the rules in the switch
  */
 struct RuleUpdatePacketHeader {
@@ -111,6 +125,9 @@ static const int DATA_HEADER_LEN = sizeof(DataPacketHeader);
 static const int RULE_UPDATE_HEADER_LEN = sizeof(RuleUpdatePacketHeader);
 static const int HELLO_HEADER_LEN = sizeof(HelloPacketHeader);
 static const int NETWORK_UPDATE_HEADER_LEN = sizeof(NetworkUpdatePacketHeader);
+static const int REGISTRATION_HEADER_LEN = sizeof(RegistrationPacketHeader);
+static const int REGISTRATION_RESPONSE_HEADER_LEN = 
+                                      sizeof(RegistrationResponsePacketHeader);
 
 #endif 
 
