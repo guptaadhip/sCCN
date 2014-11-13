@@ -62,6 +62,7 @@ void Switch::handleRegistrationResp() {
     bcopy(pending->packet + PACKET_HEADER_LEN, &regResponse, 
                                       REGISTRATION_RESPONSE_HEADER_LEN);
     myController_ = regResponse.nodeId;
+    controllerIf_ = pending->interface;
     registered_ = true;
     Logger::log(Log::DEBUG, __FUNCTION__, __LINE__,
                 "Registered with Controller: " + std::to_string(myController_)

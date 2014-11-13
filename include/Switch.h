@@ -8,10 +8,10 @@
 class Switch{
  public:
   Switch(unsigned int myId);
-  /*Send hello*/
+  /*
+   * Send hello
+   */
   void sendHello();
-  /*Send "I am up" message*/
-  void sendImUp();
   /*
    * Send Registration Packet on all interfaces till 
    * ack is not received. Every 2 seconds the packet will be sent
@@ -31,6 +31,7 @@ class Switch{
   MyInterfaces myInterface_;
   unsigned int myId_;
   unsigned int myController_;
+  std::string controllerIf_;
   PacketHandler packetHandler_;
   bool registered_;
 
