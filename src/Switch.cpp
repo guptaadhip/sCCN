@@ -58,6 +58,8 @@ void Switch::sendRegistration() {
     for (auto &entry : ifToPacketEngine) {
       entry.second.send(packet, PACKET_HEADER_LEN + REGISTRATION_HEADER_LEN);
     }
+    /* TBD: Remove this break */
+    break;
     sleep(2);
   }
 }
