@@ -2,12 +2,14 @@
 #ifndef __NET_H_INCLUDED__
 #define __NET_H_INCLUDED__
 #include <string>
+#include <unordered_map>
 
 static const int BUFLEN = 1470;
+
+
 /*
  * Task Structure
  */
-
 struct PacketEntry {
   char packet[BUFLEN];
   std::string interface;

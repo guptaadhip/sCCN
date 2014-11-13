@@ -1,6 +1,6 @@
 #include "include/PacketHandler.h"
-#include <iostream>
 #include "include/Logger.h"
+#include <cstring>
 
 void PacketHandler::queuePacket(PacketEntry *t) {
   PacketEntry *stale_head = packet_in_queue_.load(std::memory_order_relaxed);
@@ -15,7 +15,8 @@ void PacketHandler::queuePacket(PacketEntry *t) {
   }
 }
 
-void PacketHandler::processQueueController() {
+void PacketHandler::processQueueController(
+                                      PacketTypeToQueue *packetTypeToQueue) {
   /* first one needs to be removed */
   (void) packet_in_queue_.exchange(0, std::memory_order_consume);
   while(true) {
@@ -27,5 +28,16 @@ void PacketHandler::processQueueController() {
     }
     Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
                 "received packet from " + pending->interface);
+    PacketTypeHeader header;
+    bcopy(pending->packet, &header, PACKET_HEADER_LEN);
+    auto entry = packetTypeToQueue->find((unsigned short) header.packetType);
+    if (entry != packetTypeToQueue->end()) {
+      entry->second->queuePacket(pending);
+    } else {
+      Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
+                "no packet handling queue found " + std::to_string(
+                (unsigned short) header.packetType) + " from " 
+                + pending->interface);
+    }
   }
 }

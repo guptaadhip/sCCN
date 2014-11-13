@@ -1,23 +1,23 @@
 #pragma once
 #include "include/net.h"
-#include "include/Queue.h"
 #include <thread>
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
 
-class PacketHandler {
+class Queue {
  public:
   /*
    * Function to queue the Packet Entry
    */
   void queuePacket(PacketEntry *t);
+
   /*
-   * Function to Process the Packet Entry by Controller
+   * Variables to be accessed by the handler threads
    */
-  void processQueueController(PacketTypeToQueue *packetTypeToQueue);
- private:
   std::mutex packet_ready_mutex_;
   std::condition_variable packet_ready_;
   std::atomic<PacketEntry *> packet_in_queue_;
 };
+
+typedef std::unordered_map<unsigned short, Queue *> PacketTypeToQueue;

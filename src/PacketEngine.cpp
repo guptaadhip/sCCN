@@ -167,7 +167,7 @@ void PacketEngine::receive(char *packetOld) {
       continue;
     }
     PacketEntry packetEntry;
-    bcopy(packetEntry.packet, packet, BUFLEN); 
+    bcopy(packet, packetEntry.packet, BUFLEN); 
     packetEntry.interface = interface_;
     packetHandler_->queuePacket(&packetEntry);
     return;
