@@ -13,9 +13,9 @@ class PacketHandler {
    */
   void queuePacket(PacketEntry *t);
   /*
-   * Function to Process the Packet Entry by Controller
+   * Function to Process the Packet Entry
    */
-  void processQueueController(PacketTypeToQueue *packetTypeToQueue);
+  void processQueue(PacketTypeToQueue *packetTypeToQueue);
  private:
   std::mutex packet_ready_mutex_;
   std::condition_variable packet_ready_;

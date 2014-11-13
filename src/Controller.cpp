@@ -43,7 +43,7 @@ Controller::Controller(unsigned int myId) {
    * Create Queue Handler
    */
   auto thread = std::thread(&Controller::handleSwitchRegistration, this);
-  packetHandler_.processQueueController(&packetTypeToQueue);
+  packetHandler_.processQueue(&packetTypeToQueue);
   /* waiting for all the packet engine threads */
   for (auto& joinThreads : packetEngineThreads) joinThreads.join();
 }
@@ -92,7 +92,8 @@ void Controller::handleSwitchRegistration() {
     memcpy(packet, &header, PACKET_HEADER_LEN);
     memcpy(packet + PACKET_HEADER_LEN, &respHeader, 
                                     REGISTRATION_RESPONSE_HEADER_LEN);
-    entry->second.send(packet, REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN);
+    int len = REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN;
+    entry->second.send(packet, len);
     Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
                 "received registration packet from " + pending->interface
                 + " node: " + std::to_string(regPacket.nodeId));

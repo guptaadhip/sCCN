@@ -15,8 +15,7 @@ void PacketHandler::queuePacket(PacketEntry *t) {
   }
 }
 
-void PacketHandler::processQueueController(
-                                      PacketTypeToQueue *packetTypeToQueue) {
+void PacketHandler::processQueue(PacketTypeToQueue *packetTypeToQueue) {
   /* first one needs to be removed */
   (void) packet_in_queue_.exchange(0, std::memory_order_consume);
   while(true) {

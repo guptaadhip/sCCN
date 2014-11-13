@@ -3,10 +3,11 @@
 #include "include/MyInterfaces.h"
 #include "include/PacketEngine.h"
 #include "include/PacketHandler.h"
+#include "include/Queue.h"
 
 class Switch{
  public:
-  Switch(unsigned int switchId);
+  Switch(unsigned int myId);
   /*Send hello*/
   void sendHello();
   /*Send "I am up" message*/
@@ -19,14 +20,25 @@ class Switch{
   /*
    * Handle Registration Response from Controller
    */
-  void handleRegistration();
+  void handleRegistrationResp();
+  /*
+   * Start receiving from interfaces
+   */
+  void startSniffing(std::string myInterface, PacketEngine *packetEngine);
 
  private:
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine;
   MyInterfaces myInterface_;
-  unsigned int switchId_;
+  unsigned int myId_;
+  unsigned int myController_;
   PacketHandler packetHandler_;
   bool registered_;
+
+  PacketTypeToQueue packetTypeToQueue;
+  /*
+   * Queues for the handler threads
+   */
+  Queue switchRegRespQueue_;
 };
    
     
