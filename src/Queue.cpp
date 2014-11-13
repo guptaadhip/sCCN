@@ -1,5 +1,4 @@
 #include "include/PacketHandler.h"
-#include "include/Logger.h"
 
 void Queue::queuePacket(PacketEntry *t) {
   PacketEntry *stale_head = packet_in_queue_.load(std::memory_order_relaxed);

@@ -29,6 +29,6 @@ std::vector<std::string> MyInterfaces::getInterfaceList() const {
 
 void MyInterfaces::printInterfaceList() {
   for(auto &entry : interfaces_) {
-    Logger::log(Log::INFO, __FUNCTION__, __LINE__, entry);
+    Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, entry);
   }
 }

@@ -25,7 +25,7 @@ void PacketHandler::processQueue(PacketTypeToQueue *packetTypeToQueue) {
       if( !packet_in_queue_ ) packet_ready_.wait(lock);
       continue;
     }
-    Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "received packet from " + pending->interface);
     PacketTypeHeader header;
     bcopy(pending->packet, &header, PACKET_HEADER_LEN);
@@ -33,7 +33,7 @@ void PacketHandler::processQueue(PacketTypeToQueue *packetTypeToQueue) {
     if (entry != packetTypeToQueue->end()) {
       entry->second->queuePacket(pending);
     } else {
-      Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "no packet handling queue found " + std::to_string(
                 (unsigned short) header.packetType) + " from " 
                 + pending->interface);

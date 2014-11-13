@@ -64,7 +64,7 @@ void Switch::handleRegistrationResp() {
     myController_ = regResponse.nodeId;
     controllerIf_ = pending->interface;
     registered_ = true;
-    Logger::log(Log::DEBUG, __FUNCTION__, __LINE__,
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                 "Registered with Controller: " + std::to_string(myController_)
                 + " at interface: " + pending->interface);
   }

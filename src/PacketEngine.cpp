@@ -26,17 +26,17 @@ PacketEngine::PacketEngine(std::string interface, unsigned int id,
    /* creating sending socket */
    socketFd_ = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
    if (socketFd_ < 0) {
-       Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+       Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
        							"PacketEngine : Error in opening sending socket");
    }
 
   if (setsockopt(socketFd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int)) == -1) {
-    Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+    Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
        					"PacketEngine : Error setting socket option");
   }
 
   if (setsockopt(socketFd_, SOL_SOCKET, SO_RCVBUF, &bufSize, sizeof(int)) == -1) {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
        					"PacketEngine : Error setting socket option");
 
   }
@@ -61,11 +61,11 @@ void PacketEngine::initializeEngine() {
     memcpy(ifr.ifr_name,if_name,if_name_len);
     ifr.ifr_name[if_name_len]=0;
   } else {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
        					"PacketEngine : interface name is too long");
   }
   if (ioctl(socketFd_, SIOCGIFINDEX, &ifr)==-1) {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__,
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
     						"Packet Engine: Error getting Interface Index");
   }
   interfaceIdx_ = ifr.ifr_ifindex;
@@ -83,20 +83,20 @@ void PacketEngine::initializeEngine() {
   
   /* Binding the receiving socket to the interafce if_name */
   if (bind(socketFd_, (struct sockaddr *) &raddrll, sizeof(raddrll)) < 0) {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__,
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
     						"PacketEngine: Error binding to socket");
   }
   
   /* Get the current flags that the device might have */
   if (ioctl (socketFd_, SIOCGIFFLAGS, &ifr) == -1) {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__,
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
     			"Error: Could not retrive the flags from the device.");
   }
   
   /* Set the old flags plus the IFF_PROMISC flag */
   ifr.ifr_flags |= IFF_PROMISC;
   if (ioctl (socketFd_, SIOCSIFFLAGS, &ifr) == -1) {
-    Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__,
+    Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
     						"Error: Could not set flag IFF_PROMISC");
   }
 }
@@ -116,7 +116,7 @@ void PacketEngine::forward(char *buffer, unsigned int size) {
  
   if (sendto(socketFd_, buffer, size, 0,
              (struct sockaddr*)&saddrll, sizeof(saddrll)) < 0) {
-    Logger::log(Log::DEBUG, __FUNCTION__, __LINE__,
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
     						"Packet Engine: Error sending Packet");
   }
 }

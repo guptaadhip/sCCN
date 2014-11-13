@@ -14,7 +14,8 @@ using namespace std;
  */
 
 Controller::Controller(unsigned int myId) {
-  Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, "Entering Controller");
+  Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                                                     "Entering Controller");
   std::vector<std::thread> packetEngineThreads;
 
   /* filling the interface to PacketEngine map */ 
@@ -80,7 +81,7 @@ void Controller::handleSwitchRegistration() {
      */
     auto entry = ifToPacketEngine.find(pending->interface);
     if (entry == ifToPacketEngine.end()) {
-      Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+      Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
                   "cannot find packet engine for interface "
                   + pending->interface);
     }
@@ -94,7 +95,7 @@ void Controller::handleSwitchRegistration() {
                                     REGISTRATION_RESPONSE_HEADER_LEN);
     int len = REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN;
     entry->second.send(packet, len);
-    Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "received registration packet from " + pending->interface
                 + " node: " + std::to_string(regPacket.nodeId));
   }
@@ -115,7 +116,7 @@ void Controller::startSniffing(std::string myInterface,
     bcopy(packet, &packetTypeHeader, PACKET_HEADER_LEN);
     bcopy(packet + PACKET_HEADER_LEN, &helloPacketHeader, HELLO_HEADER_LEN);
     if(packetTypeHeader.packetType == PacketType::HELLO) {
-      Logger::log(Log::DEBUG, __FUNCTION__, __LINE__, 
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "Received a Hello packet from" 
                   + std::to_string(helloPacketHeader.nodeId) + " from " 
                   + myInterface);

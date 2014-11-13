@@ -12,5 +12,6 @@ enum class Log {
 
 class Logger {
  public:
-   static void log(Log logType, std::string function, int line, std::string msg);
+   static void log(Log logType, std::string fileName, 
+                   std::string function, int line, std::string msg);
 };
