@@ -2,7 +2,9 @@
 #include "include/net.h"
 #include "include/Logger.h"
 #include "include/MyInterfaces.h"
+#include <unistd.h>
 #include <thread>
+#include <algorithm>
 #include <unordered_map>
 #include <cstring>
 
@@ -35,18 +37,75 @@ Controller::Controller(unsigned int myId) {
   /* 
    * create queue objects for the different handler threads
    */
-  packetTypeToQueue.insert(std::pair<unsigned short, Queue *> 
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
                     ((unsigned short) PacketType::REGISTRATION_REQ, &regQueue_));
-  packetTypeToQueue.insert(std::pair<unsigned short, Queue *> 
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
            ((unsigned short) PacketType::SWITCH_REGISTRATION, &switchRegQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
+           ((unsigned short) PacketType::HELLO, &helloQueue_));
 
   /*
    * Create Queue Handler
    */
   auto thread = std::thread(&Controller::handleSwitchRegistration, this);
-  packetHandler_.processQueue(&packetTypeToQueue);
+  auto helloHandlerThread = std::thread(&Controller::handleHello, this);
+  auto helloThread = std::thread(&Controller::switchStateHandler, this);
+  packetHandler_.processQueue(&packetTypeToQueue_);
   /* waiting for all the packet engine threads */
   for (auto& joinThreads : packetEngineThreads) joinThreads.join();
+}
+
+/*
+ * Thead to manage Switch State based on the hello message received
+ */
+void Controller::switchStateHandler() {
+  while (true) {
+    for (auto nodeId : switchList_) {
+      if (switchToHello_[nodeId] == false) {
+        switchToHelloCount_[nodeId] = switchToHelloCount_[nodeId] + 1;
+      }
+      switchToHello_[nodeId] = false;
+      /* if counter is 3 then set the switch status to down */
+      if (switchToHelloCount_[nodeId] >= 3) {
+        /* remove all the entries */
+        switchList_.erase(std::remove(switchList_.begin(), 
+                             switchList_.end(), nodeId), switchList_.end());
+        switchToHelloCount_.erase(nodeId);
+        switchToHello_.erase(nodeId);
+        switchToIf_.erase(nodeId);
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                    "Switch: " + std::to_string(nodeId) + " is down");
+      }
+    }
+    sleep(1);
+  }
+}
+
+/*
+ * Handle Hello message 
+ */
+void Controller::handleHello() {
+  /* first one needs to be removed */
+  (void) helloQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
+  while(true) {
+    auto pending = helloQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) { 
+      std::unique_lock<std::mutex> lock(helloQueue_.packet_ready_mutex_);    
+      if( !helloQueue_.packet_in_queue_) {
+        helloQueue_.packet_ready_.wait(lock);
+      }
+      continue;
+    }
+    struct HelloPacketHeader helloPacket;
+    bcopy(pending->packet + PACKET_HEADER_LEN, &helloPacket, HELLO_HEADER_LEN);
+    /* Set true that a hello was received from switch */
+    switchToHello_[helloPacket.nodeId] = true;
+    /* Set counter to 0 */
+    switchToHelloCount_[helloPacket.nodeId] = 0;
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "Received hello from: " + std::to_string(helloPacket.nodeId));
+  }
 }
 
 /*
@@ -71,11 +130,11 @@ void Controller::handleSwitchRegistration() {
     /*
      * Add node to the list of switches
      */
-    switchList.push_back(regPacket.nodeId);
+    switchList_.push_back(regPacket.nodeId);
     /*
      * Add the switch and interface mapping
      */
-    switchToIf[regPacket.nodeId] = pending->interface;
+    switchToIf_[regPacket.nodeId] = pending->interface;
     /*
      * Send ACK back to the switch
      */
@@ -85,6 +144,9 @@ void Controller::handleSwitchRegistration() {
                   "cannot find packet engine for interface "
                   + pending->interface);
     }
+    /* Set counter to 0 */
+    switchToHelloCount_[regPacket.nodeId] = 0;
+
     char packet[REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN];
     PacketTypeHeader header;
     header.packetType = PacketType::SWITCH_REGISTRATION_ACK;
@@ -95,6 +157,8 @@ void Controller::handleSwitchRegistration() {
                                     REGISTRATION_RESPONSE_HEADER_LEN);
     int len = REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN;
     entry->second.send(packet, len);
+    /* Set true that a hello was received from switch */
+    switchToHello_[regPacket.nodeId] = true;
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "received registration packet from " + pending->interface
                 + " node: " + std::to_string(regPacket.nodeId));
