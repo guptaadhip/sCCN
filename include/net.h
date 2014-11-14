@@ -1,8 +1,21 @@
 #pragma once
 #ifndef __NET_H_INCLUDED__
 #define __NET_H_INCLUDED__
+#include <string>
+#include <unordered_map>
 
 static const int BUFLEN = 1470;
+
+
+/*
+ * Task Structure
+ */
+struct PacketEntry {
+  char packet[BUFLEN];
+  std::string interface;
+  struct PacketEntry *next;
+};
+
 /*
  * Packet Types
  */
@@ -22,6 +35,8 @@ enum class PacketType: unsigned short {
   HELLO = 0xCC,
   DATA = 0xCD,
   NETWORK_UPDATE = 0xCE,
+  SWITCH_REGISTRATION = 0xCF,
+  SWITCH_REGISTRATION_ACK = 0xD1,
 };
 /*
  * Type of the update packet sent from Switch to the controller
@@ -46,6 +61,20 @@ struct RequestPacketHeader {
   unsigned int sequenceNo;
   unsigned int hostId;
   unsigned int len;
+};
+
+/*
+ * Packet Structure of the Registration Packet
+ */
+struct RegistrationPacketHeader {
+  unsigned int nodeId;
+};
+
+/*
+ * Registration Response Packet Structure
+ */
+struct RegistrationResponsePacketHeader {
+  unsigned int nodeId;
 };
 
 /*
@@ -98,6 +127,9 @@ static const int DATA_HEADER_LEN = sizeof(DataPacketHeader);
 static const int RULE_UPDATE_HEADER_LEN = sizeof(RuleUpdatePacketHeader);
 static const int HELLO_HEADER_LEN = sizeof(HelloPacketHeader);
 static const int NETWORK_UPDATE_HEADER_LEN = sizeof(NetworkUpdatePacketHeader);
+static const int REGISTRATION_HEADER_LEN = sizeof(RegistrationPacketHeader);
+static const int REGISTRATION_RESPONSE_HEADER_LEN = 
+                                      sizeof(RegistrationResponsePacketHeader);
 
 #endif 
 

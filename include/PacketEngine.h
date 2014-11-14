@@ -1,9 +1,11 @@
 #pragma once
 #include <string>
+#include "include/PacketHandler.h"
 
 class PacketEngine {
  public:
-  PacketEngine(std::string interface, unsigned int id);
+  PacketEngine(std::string interface, unsigned int id, 
+               PacketHandler *packetHandler);
   /*
    * Send Packet Function
    */
@@ -35,4 +37,5 @@ class PacketEngine {
   std::string interface_;
   unsigned int myId_;
   unsigned int interfaceIdx_;
+  PacketHandler *packetHandler_;
 };

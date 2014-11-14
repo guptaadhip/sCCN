@@ -1,6 +1,7 @@
 #include "include/PacketEngine.h"
 #include "include/net.h"
 #include "include/Logger.h"
+#include "include/PacketHandler.h"
 
 #include <sys/socket.h>
 #include <net/if.h>
@@ -15,25 +16,27 @@ using namespace std;
 
 unsigned int bufSize = 33554432;
 
-PacketEngine::PacketEngine(std::string interface, unsigned int id) {
+PacketEngine::PacketEngine(std::string interface, unsigned int id,
+                           PacketHandler *packetHandler) {
    const int on = 1;
    interface_ = interface;
    myId_ = id;
+   packetHandler_ = packetHandler;
 
    /* creating sending socket */
    socketFd_ = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
    if (socketFd_ < 0) {
-       Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+       Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
        							"PacketEngine : Error in opening sending socket");
    }
 
   if (setsockopt(socketFd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int)) == -1) {
-    Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+    Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
        					"PacketEngine : Error setting socket option");
   }
 
   if (setsockopt(socketFd_, SOL_SOCKET, SO_RCVBUF, &bufSize, sizeof(int)) == -1) {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
        					"PacketEngine : Error setting socket option");
 
   }
@@ -58,11 +61,11 @@ void PacketEngine::initializeEngine() {
     memcpy(ifr.ifr_name,if_name,if_name_len);
     ifr.ifr_name[if_name_len]=0;
   } else {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__, 
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
        					"PacketEngine : interface name is too long");
   }
   if (ioctl(socketFd_, SIOCGIFINDEX, &ifr)==-1) {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__,
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
     						"Packet Engine: Error getting Interface Index");
   }
   interfaceIdx_ = ifr.ifr_ifindex;
@@ -80,20 +83,20 @@ void PacketEngine::initializeEngine() {
   
   /* Binding the receiving socket to the interafce if_name */
   if (bind(socketFd_, (struct sockaddr *) &raddrll, sizeof(raddrll)) < 0) {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__,
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
     						"PacketEngine: Error binding to socket");
   }
   
   /* Get the current flags that the device might have */
   if (ioctl (socketFd_, SIOCGIFFLAGS, &ifr) == -1) {
-  	Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__,
+  	Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
     			"Error: Could not retrive the flags from the device.");
   }
   
   /* Set the old flags plus the IFF_PROMISC flag */
   ifr.ifr_flags |= IFF_PROMISC;
   if (ioctl (socketFd_, SIOCSIFFLAGS, &ifr) == -1) {
-    Logger::log(Log::CRITICAL, __FUNCTION__, __LINE__,
+    Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
     						"Error: Could not set flag IFF_PROMISC");
   }
 }
@@ -113,7 +116,7 @@ void PacketEngine::forward(char *buffer, unsigned int size) {
  
   if (sendto(socketFd_, buffer, size, 0,
              (struct sockaddr*)&saddrll, sizeof(saddrll)) < 0) {
-    Logger::log(Log::DEBUG, __FUNCTION__, __LINE__,
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
     						"Packet Engine: Error sending Packet");
   }
 }
@@ -140,7 +143,8 @@ void PacketEngine::send(char *msg, unsigned int size) {
  * srcId will only be used by the Receiver thread, otherwise 0 to read packets
  * from all sources
  */
-void PacketEngine::receive(char *packet) {
+void PacketEngine::receive(char *packetOld) {
+  char packet[BUFLEN];
   struct sockaddr_ll saddrll;
   socklen_t senderAddrLen;
   int rc;
@@ -149,6 +153,7 @@ void PacketEngine::receive(char *packet) {
    * zeroing the sender's address struct.
    * It will be filled by the recvfrom function.
    */
+  bzero(packet, BUFLEN);
   memset((void*)&saddrll, 0, sizeof(saddrll));
   senderAddrLen = (socklen_t) sizeof(saddrll);
   
@@ -161,7 +166,9 @@ void PacketEngine::receive(char *packet) {
     if (rc < 0 || saddrll.sll_pkttype == PACKET_OUTGOING) {
       continue;
     }
-    
-    return;
+    PacketEntry packetEntry;
+    bcopy(packet, packetEntry.packet, BUFLEN); 
+    packetEntry.interface = interface_;
+    packetHandler_->queuePacket(&packetEntry);
   }
 }
