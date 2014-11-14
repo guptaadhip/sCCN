@@ -30,6 +30,10 @@ class Controller {
   void handleHello();
 
   /*
+   * Send Hello Messages to Switch
+   */
+  void sendHello();
+  /*
    * Thead to manage Switch State based on the hello message received
    */
   void switchStateHandler();

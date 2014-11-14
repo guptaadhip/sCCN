@@ -49,7 +49,8 @@ Controller::Controller(unsigned int myId) {
    */
   auto thread = std::thread(&Controller::handleSwitchRegistration, this);
   auto helloHandlerThread = std::thread(&Controller::handleHello, this);
-  auto helloThread = std::thread(&Controller::switchStateHandler, this);
+  auto switchStateThread = std::thread(&Controller::switchStateHandler, this);
+  auto helloThread = std::thread(&Controller::sendHello, this);
   packetHandler_.processQueue(&packetTypeToQueue_);
   /* waiting for all the packet engine threads */
   for (auto& joinThreads : packetEngineThreads) joinThreads.join();
@@ -105,6 +106,27 @@ void Controller::handleHello() {
     switchToHelloCount_[helloPacket.nodeId] = 0;
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "Received hello from: " + std::to_string(helloPacket.nodeId));
+  }
+}
+
+/*
+ * Send hello to switches
+ */
+void Controller::sendHello() {
+  char packet[PACKET_HEADER_LEN + HELLO_HEADER_LEN];
+  bzero(packet, PACKET_HEADER_LEN + HELLO_HEADER_LEN);
+  struct PacketTypeHeader header;
+  header.packetType = PacketType::HELLO;
+  struct HelloPacketHeader helloPacketHeader;
+  helloPacketHeader.nodeId = myId_;
+
+  memcpy(packet, &header, PACKET_HEADER_LEN);
+  memcpy(packet + PACKET_HEADER_LEN, &helloPacketHeader, HELLO_HEADER_LEN);
+  while (true) {
+    for (auto &entry : ifToPacketEngine) {
+      entry.second.send(packet, PACKET_HEADER_LEN + HELLO_HEADER_LEN);
+    }
+    sleep(1);
   }
 }
 
