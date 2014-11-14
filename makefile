@@ -2,13 +2,20 @@
 # project name (generate executable with this name)
 TARGET   = sccn
 
+# PF_RING Library
+CPFRING = -I/usr/local/PF_RING/userland/lib -I/usr/local/PF_RING/kernel
+
+# PF_RING libraries needed for linking
+LPFRING = /usr/local/PF_RING/userland/lib/libpfring.a   
+LPCAP = /usr/local/PF_RING/userland/libpcap-1.1.1-ring/libpcap.a
+
 CC       = g++
 # compiling flags here
-CFLAGS   = -std=c++11 -Wall -I. -pthread -ggdb
+CFLAGS   = -std=c++11 -Wall -I. $(CPFRING) -pthread -ggdb
 
 LINKER   = g++ -o
 # linking flags here
-LFLAGS   = -Wall -I. -lm -ggdb -pthread
+LFLAGS   = -Wall -I. $(CPFRING) $(LPFRING) $(LPCAP) -lm -ggdb -lrt -lnuma -pthread
 
 SRCDIR   = src
 INCLUDEDIR   = include

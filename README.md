@@ -23,11 +23,11 @@ sudo apt-get install g++-4.8<br><br>
 - sudo apt-get install bison<br>
 - sudo apt-get install libnuma-dev<br>
 - sudo apt-get install subversion<br>
-- svn co https://svn.ntop.org/svn/ntop/trunk/PF_RING/<br>
-- cd PF_RING/kernel<br>
-- make<br>
-- sudo insmod ./pf_ring.ko<br>
-- cd ../userland<br>
+- sudo svn co https://svn.ntop.org/svn/ntop/trunk/PF_RING/ /usr/local/PF_RING<br>
+- cd /usr/local/PF_RING/kernel<br>
+- sudo make<br>
+- sudo insmod /usr/local/PF_RING/kernel/pf_ring.ko<br>
+- cd /usr/local/PF_RING/userland<br>
 - make<br>
 
 
