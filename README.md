@@ -28,7 +28,7 @@ sudo apt-get install g++-4.8<br><br>
 - sudo make<br>
 - sudo insmod /usr/local/PF_RING/kernel/pf_ring.ko<br>
 - cd /usr/local/PF_RING/userland<br>
-- make<br>
+- sudo make<br>
 
 
 Running
