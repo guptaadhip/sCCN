@@ -41,6 +41,10 @@ Switch::Switch(unsigned int myId) {
    * until registration the switch should not do anything
    */
   auto sendRegReq = std::thread(&Switch::sendRegistration, this);
+  /*
+   * send hello thread
+   */
+  auto sendHello = std::thread(&Switch::sendHello, this);
   packetHandler_.processQueue(&packetTypeToQueue);
 
 }
@@ -81,6 +85,9 @@ void Switch::startSniffing(std::string myInterface,
   packetEngine->receive(packet);
 }
 
+/*
+ * Send Hello Thread
+ */
 void Switch::sendHello() {
   char packet[PACKET_HEADER_LEN + HELLO_HEADER_LEN];
   bzero(packet, PACKET_HEADER_LEN + HELLO_HEADER_LEN);
@@ -91,9 +98,12 @@ void Switch::sendHello() {
 
   memcpy(packet, &header, PACKET_HEADER_LEN);
   memcpy(packet + PACKET_HEADER_LEN, &helloPacketHeader, HELLO_HEADER_LEN);
-  for (auto &entry : ifToPacketEngine) {
-    entry.second.send(packet, PACKET_HEADER_LEN + HELLO_HEADER_LEN);
-  } 
+  while (true) {
+    for (auto &entry : ifToPacketEngine) {
+      entry.second.send(packet, PACKET_HEADER_LEN + HELLO_HEADER_LEN);
+    }
+    sleep(1);
+  }
 }
 
 void Switch::sendRegistration() {
