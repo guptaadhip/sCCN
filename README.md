@@ -12,11 +12,32 @@ http://www.linuxfromscratch.org/blfs/view/svn/general/boost.html
 
 Install
 -------
-1) Boost:
-sudo apt-get install libboost-all-dev
+1) Boost:<br>
+sudo apt-get install libboost-all-dev<br><br>
 
-2) G++
-sudo apt-get install g++-4.8
+2) G++<br>
+sudo apt-get install g++-4.8<br><br>
+
+3) PF_RING: <br>
+- sudo apt-get install flex<br>
+- sudo apt-get install bison<br>
+- sudo apt-get install libnuma-dev<br>
+- sudo apt-get install subversion<br>
+- svn co https://svn.ntop.org/svn/ntop/trunk/PF_RING/<br>
+- cd PF_RING/kernel<br>
+- make<br>
+- sudo insmod ./pf_ring.ko<br>
+- cd ../userland<br>
+- make<br>
+
+
+Running
+-------
+
+1) Controller: <br>
+sudo bin/sccn 1 Controller dbg<br><br>
+2) Switch: <br>
+sudo bin/sccn 2 Switch dbg<br><br>
 
 Proposal
 ========
