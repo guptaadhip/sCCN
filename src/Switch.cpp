@@ -106,6 +106,12 @@ void Switch::handleRuleUpdate() {
                   "adding rule: " + std::to_string(ruleHeader.uniqueId) 
                   + " " + ruleHeader.interface);
     } else if ((int) ruleHeader.type == (int) UpdateType::DELETE) {
+      auto entries = forwardingTable_.equal_range(ruleHeader.uniqueId);
+      for (auto entry = entries.first; entry != entries.second; ++entry) {
+        if(entry->second.compare(ruleHeader.interface) == 0) {
+          forwardingTable_.erase(entry);
+        }
+      }
       /* delete rule to the forwarding table */
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "write the code to delete");
