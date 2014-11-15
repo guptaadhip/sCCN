@@ -26,11 +26,11 @@ Controller::Controller(unsigned int myId) {
     PacketEngine packetEngine(entry, myId, &packetHandler_);
     /* make a pair of interface and packet engine */
     std::pair<std::string, PacketEngine> ifPePair (entry, packetEngine);
-    ifToPacketEngine.insert(ifPePair);
+    ifToPacketEngine_.insert(ifPePair);
   }
 
   /* making packetEngine threads for all interfaces */
-  for(auto it = ifToPacketEngine.begin(); it != ifToPacketEngine.end(); it++) {
+  for(auto it = ifToPacketEngine_.begin(); it != ifToPacketEngine_.end(); it++) {
     packetEngineThreads.push_back(std::thread(&Controller::startSniffing, this,
                                   it->first, &it->second));
   }
@@ -124,7 +124,7 @@ void Controller::sendHello() {
   memcpy(packet, &header, PACKET_HEADER_LEN);
   memcpy(packet + PACKET_HEADER_LEN, &helloPacketHeader, HELLO_HEADER_LEN);
   while (true) {
-    for (auto &entry : ifToPacketEngine) {
+    for (auto &entry : ifToPacketEngine_) {
       entry.second.send(packet, PACKET_HEADER_LEN + HELLO_HEADER_LEN);
     }
     sleep(1);
@@ -161,8 +161,8 @@ void Controller::handleSwitchRegistration() {
     /*
      * Send ACK back to the switch
      */
-    auto entry = ifToPacketEngine.find(pending->interface);
-    if (entry == ifToPacketEngine.end()) {
+    auto entry = ifToPacketEngine_.find(pending->interface);
+    if (entry == ifToPacketEngine_.end()) {
       Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
                   "cannot find packet engine for interface "
                   + pending->interface);

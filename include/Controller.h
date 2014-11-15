@@ -45,7 +45,7 @@ class Controller {
 
  private:
   unsigned int myId_;
-  std::unordered_map<std::string, PacketEngine> ifToPacketEngine;
+  std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
   MyInterfaces myInterfaces_;
   PacketHandler packetHandler_;
   PacketTypeToQueue packetTypeToQueue_;
