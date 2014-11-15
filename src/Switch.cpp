@@ -35,6 +35,8 @@ Switch::Switch(unsigned int myId) {
                         ((unsigned short) PacketType::HELLO, &helloQueue_));
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
                         ((unsigned short) PacketType::DATA, &dataQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+                        ((unsigned short) PacketType::RULE, &ruleQueue_));
   /*
    * Control Request Packets
    */
@@ -55,6 +57,7 @@ Switch::Switch(unsigned int myId) {
   auto hellothread = std::thread(&Switch::handleHello, this);
   auto controlPacketthread = std::thread(&Switch::handleControlRequest, this);
   auto dataPacketthread = std::thread(&Switch::handleData, this);
+  auto rulethread = std::thread(&Switch::handleRuleUpdate, this);
 
   auto nodeStatethread = std::thread(&Switch::nodeStateHandler, this);
 
@@ -70,6 +73,45 @@ Switch::Switch(unsigned int myId) {
   auto sendHello = std::thread(&Switch::sendHello, this);
   packetHandler_.processQueue(&packetTypeToQueue_);
 
+}
+
+/*
+ * Handle Rule update packet
+ */
+void Switch::handleRuleUpdate() {
+  /* first one needs to be removed */
+  (void) ruleQueue_.packet_in_queue_.exchange(0, std::memory_order_consume);
+  while(true) {
+    auto pending = ruleQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) { 
+      std::unique_lock<std::mutex> lock (ruleQueue_.packet_ready_mutex_); 
+      if( !ruleQueue_.packet_in_queue_) {
+        ruleQueue_.packet_ready_.wait(lock);
+      }
+      continue;
+    }
+    if (pending->interface.compare(controllerIf_) != 0) {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                  "incorrect interface for the rule update packet");
+      continue;
+    }
+    RuleUpdatePacketHeader ruleHeader; 
+    bcopy(pending->packet + PACKET_HEADER_LEN, &ruleHeader, RULE_UPDATE_HEADER_LEN);
+    if ((int) ruleHeader.type == (int) UpdateType::ADD) {
+      /* add rule to the forwarding table */
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                  "write the code to add");
+
+    } else if ((int) ruleHeader.type == (int) UpdateType::DELETE) {
+      /* delete rule to the forwarding table */
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                  "write the code to delete");
+    } else {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                  "incorrect update type: " + (char) ruleHeader.type);
+    }
+  }
 }
 
 /*

@@ -43,6 +43,11 @@ class Switch{
   void handleData();
 
   /*
+   * Handle Rule update packets from controller
+   */
+  void handleRuleUpdate();
+
+  /*
    * Start receiving from interfaces
    */
   void startSniffing(std::string myInterface, PacketEngine *packetEngine);
@@ -65,7 +70,6 @@ class Switch{
   std::vector<unsigned int> nodeList_;
   std::unordered_map<unsigned int, bool> nodeToHello_;
   std::unordered_map <unsigned int, int> nodeToHelloCount_;
-
   std::unordered_multimap<unsigned int, std::string> forwardingTable_; 
   /*
    * Queues for the handler threads
@@ -74,4 +78,5 @@ class Switch{
   Queue helloQueue_;
   Queue controlRequestQueue_;
   Queue dataQueue_;
+  Queue ruleQueue_;
 };
