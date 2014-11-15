@@ -45,6 +45,17 @@ Controller::Controller(unsigned int myId) {
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
            ((unsigned short) PacketType::HELLO, &helloQueue_));
 
+  /* Registration/Deregistration queue */
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
+          ((unsigned short) PacketType::REGISTRATION_REQ, &registrationQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
+        ((unsigned short) PacketType::DEREGISTRATION_REQ, &registrationQueue_));
+  /* Subscription/Desubscription queue */
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
+          ((unsigned short) PacketType::SUBSCRIPTION_REQ, &subscriptionQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
+        ((unsigned short) PacketType::DESUBSCRIPTION_REQ, &subscriptionQueue_));
+
   /*
    * Create Queue Handler
    */
