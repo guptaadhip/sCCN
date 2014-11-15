@@ -16,6 +16,7 @@ using namespace std;
  */
 
 Controller::Controller(unsigned int myId) {
+  myId_ = myId;
   Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                                                      "Entering Controller");
   std::vector<std::thread> packetEngineThreads;
