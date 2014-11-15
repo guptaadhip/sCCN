@@ -33,6 +33,8 @@ Switch::Switch(unsigned int myId) {
                           &switchRegRespQueue_));
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
                         ((unsigned short) PacketType::HELLO, &helloQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+                        ((unsigned short) PacketType::DATA, &dataQueue_));
   /*
    * Control Request Packets
    */
@@ -52,6 +54,7 @@ Switch::Switch(unsigned int myId) {
   auto regRespthread = std::thread(&Switch::handleRegistrationResp, this);
   auto hellothread = std::thread(&Switch::handleHello, this);
   auto controlPacketthread = std::thread(&Switch::handleControlRequest, this);
+  auto dataPacketthread = std::thread(&Switch::handleData, this);
 
   auto nodeStatethread = std::thread(&Switch::nodeStateHandler, this);
 
@@ -69,6 +72,51 @@ Switch::Switch(unsigned int myId) {
 
 }
 
+/*
+ * Print the forwarding Table
+ */
+void Switch::printForwardingTable() {
+  Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
+              "Unique Id :: Interface");
+  for (auto& entry : forwardingTable_) {
+    Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
+                std::to_string(entry.first) + " :: " + entry.second);
+  }
+}
+
+/*
+ * Handle data packet forwarding
+ */
+void Switch::handleData() {
+  /* first one needs to be removed */
+  (void) dataQueue_.packet_in_queue_.exchange(0, std::memory_order_consume);
+  while(true) {
+    auto pending = dataQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) { 
+      std::unique_lock<std::mutex> lock (dataQueue_.packet_ready_mutex_); 
+      if( !dataQueue_.packet_in_queue_) {
+        dataQueue_.packet_ready_.wait(lock);
+      }
+      continue;
+    }
+    DataPacketHeader dataHeader; 
+    bcopy(pending->packet + PACKET_HEADER_LEN, &dataHeader, DATA_HEADER_LEN);
+    auto entries = forwardingTable_.equal_range(dataHeader.uniqueId);
+    for (auto entry = entries.first; entry != entries.second; ++entry) {
+      auto packetEngine = ifToPacketEngine_.find(entry->second);
+      if (packetEngine == ifToPacketEngine_.end()) {
+        Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
+                    "Packet Engine not found for " + entry->second);
+        continue;
+      }
+      /* TBD: Change the BUFLEN to the correct packet size */
+      packetEngine->second.forward(pending->packet, BUFLEN);
+      packetEngine->second.forward(pending->packet, 
+                          dataHeader.len + DATA_HEADER_LEN + PACKET_HEADER_LEN);
+    }
+  }
+}
 /*
  * Handle Control Packets from hosts
  */

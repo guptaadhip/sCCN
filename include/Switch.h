@@ -38,9 +38,19 @@ class Switch{
   void handleControlRequest();
 
   /*
+   * Handle Data Packets from host
+   */
+  void handleData();
+
+  /*
    * Start receiving from interfaces
    */
   void startSniffing(std::string myInterface, PacketEngine *packetEngine);
+
+  /*
+   * Print forwarding table
+   */
+  void printForwardingTable();
 
  private:
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
@@ -56,10 +66,12 @@ class Switch{
   std::unordered_map<unsigned int, bool> nodeToHello_;
   std::unordered_map <unsigned int, int> nodeToHelloCount_;
 
+  std::unordered_multimap<unsigned int, std::string> forwardingTable_; 
   /*
    * Queues for the handler threads
    */
   Queue switchRegRespQueue_;
   Queue helloQueue_;
   Queue controlRequestQueue_;
+  Queue dataQueue_;
 };
