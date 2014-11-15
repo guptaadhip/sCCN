@@ -86,7 +86,7 @@ struct RegistrationResponsePacketHeader {
 struct RuleUpdatePacketHeader {
   UpdateType type;
   unsigned int uniqueId;
-  unsigned short port;
+  std::string interface;
 };
 
 /*
@@ -102,7 +102,7 @@ struct HelloPacketHeader {
 struct NetworkUpdatePacketHeader {
   UpdateType type;
   unsigned int nodeId;
-  unsigned short port;
+  std::string interface;
 };
 
 /*
