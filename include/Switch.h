@@ -18,6 +18,16 @@ class Switch{
    */
   void sendRegistration();
   /*
+   * Handle Hello Messages from Nodes [Switches/Controller]
+   */
+  void handleHello();
+
+  /*
+   * Thead to manage Switch State based on the hello message received
+   */
+  void nodeStateHandler();
+
+  /*
    * Handle Registration Response from Controller
    */
   void handleRegistrationResp();
@@ -34,15 +44,15 @@ class Switch{
   std::string controllerIf_;
   PacketHandler packetHandler_;
   bool registered_;
-
   PacketTypeToQueue packetTypeToQueue;
+
+  std::vector<unsigned int> nodeList_;
+  std::unordered_map<unsigned int, bool> nodeToHello_;
+  std::unordered_map <unsigned int, int> nodeToHelloCount_;
+
   /*
    * Queues for the handler threads
    */
   Queue switchRegRespQueue_;
+  Queue helloQueue_;
 };
-   
-    
-
-
-  

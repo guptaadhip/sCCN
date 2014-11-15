@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <algorithm>
 #include "include/Logger.h"
 #include "include/net.h"
 #include <unistd.h>
@@ -30,23 +31,96 @@ Switch::Switch(unsigned int myId) {
   packetTypeToQueue.insert(std::pair<unsigned short, Queue *>  
                         ((unsigned short) PacketType::SWITCH_REGISTRATION_ACK,
                           &switchRegRespQueue_));
+  packetTypeToQueue.insert(std::pair<unsigned short, Queue *>  
+                        ((unsigned short) PacketType::HELLO, &helloQueue_));
   /* 
    * create the switch registration response
    * handler thread 
    */
-  auto thread = std::thread(&Switch::handleRegistrationResp, this);
+  auto regRespthread = std::thread(&Switch::handleRegistrationResp, this);
+  auto hellothread = std::thread(&Switch::handleHello, this);
+
+  auto nodeStatethread = std::thread(&Switch::nodeStateHandler, this);
 
   /*
    * call the switch registration
    * until registration the switch should not do anything
    */
   auto sendRegReq = std::thread(&Switch::sendRegistration, this);
+
   /*
    * send hello thread
    */
   auto sendHello = std::thread(&Switch::sendHello, this);
   packetHandler_.processQueue(&packetTypeToQueue);
 
+}
+
+/*
+ * Handle Hello message 
+ */
+void Switch::handleHello() {
+  /* first one needs to be removed */
+  (void) helloQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
+  while(true) {
+    auto pending = helloQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) { 
+      std::unique_lock<std::mutex> lock(helloQueue_.packet_ready_mutex_);    
+      if( !helloQueue_.packet_in_queue_) {
+        helloQueue_.packet_ready_.wait(lock);
+      }
+      continue;
+    }
+    struct HelloPacketHeader helloPacket;
+    bcopy(pending->packet + PACKET_HEADER_LEN, &helloPacket, HELLO_HEADER_LEN);
+    /* Set true that a hello was received from switch */
+    nodeToHello_[helloPacket.nodeId] = true;
+    /* Set counter to 0 */
+    nodeToHelloCount_[helloPacket.nodeId] = 0;
+    /* no duplicates should go in the vector */
+    if (std::find(nodeList_.begin(), nodeList_.end(), 
+                   helloPacket.nodeId) == nodeList_.end()) {
+      nodeList_.push_back(helloPacket.nodeId);
+    }
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "Received hello from: " + std::to_string(helloPacket.nodeId));
+  }
+}
+
+/*
+ * Thead to manage Node State based on the hello message received
+ */
+void Switch::nodeStateHandler() {
+  while (true) {
+    for (auto nodeId : nodeList_) {
+      
+      if (nodeToHello_[nodeId] == false) {
+        nodeToHelloCount_[nodeId] = nodeToHelloCount_[nodeId] + 1;
+      }
+      nodeToHello_[nodeId] = false;
+      /* if counter is 3 then set the node status to down */
+      if (nodeToHelloCount_[nodeId] >= 3) {
+        /* remove all the entries */
+        nodeList_.erase(std::remove(nodeList_.begin(), 
+                             nodeList_.end(), nodeId), nodeList_.end());
+        nodeToHelloCount_.erase(nodeId);
+        nodeToHello_.erase(nodeId);
+        /* handle if controller went down */
+        if (nodeId == myController_) {
+          myController_ = 0;
+          controllerIf_ = "";
+          registered_ = false;
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                    "Controller: " + std::to_string(nodeId) + " is down");
+        } else {
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                    "Switch: " + std::to_string(nodeId) + " is down");
+        }
+      }
+    }
+    sleep(1);
+  }
 }
 
 void Switch::handleRegistrationResp() {
@@ -68,6 +142,11 @@ void Switch::handleRegistrationResp() {
     myController_ = regResponse.nodeId;
     controllerIf_ = pending->interface;
     registered_ = true;
+    /* no duplicates should go in the vector */
+    if (std::find(nodeList_.begin(), nodeList_.end(), 
+                   helloPacket.nodeId) == nodeList_.end()) {
+      nodeList_.push_back(regResponse.nodeId);
+    }
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                 "Registered with Controller: " + std::to_string(myController_)
                 + " at interface: " + pending->interface);
@@ -115,11 +194,13 @@ void Switch::sendRegistration() {
   regPacketHeader.nodeId = myId_;
   memcpy(packet, &header, PACKET_HEADER_LEN);
   memcpy(packet+PACKET_HEADER_LEN, &regPacketHeader, REGISTRATION_HEADER_LEN);
-  while (!registered_) {
-    for (auto &entry : ifToPacketEngine) {
-      entry.second.send(packet, PACKET_HEADER_LEN + REGISTRATION_HEADER_LEN);
+  while(true) {
+    while (!registered_) {
+      for (auto &entry : ifToPacketEngine) {
+        entry.second.send(packet, PACKET_HEADER_LEN + REGISTRATION_HEADER_LEN);
+      }
+      sleep(2);
     }
-    sleep(2);
   }
 }
 
