@@ -17,10 +17,10 @@ Switch::Switch(unsigned int myId) {
   for(auto &interface : myInterface_.getInterfaceList()) {
     PacketEngine packetEngine(interface, myId, &packetHandler_);
     std::pair<std::string, PacketEngine> ifPePair (interface, packetEngine); 
-    ifToPacketEngine.insert(ifPePair);
+    ifToPacketEngine_.insert(ifPePair);
   }
   /* making packetEngine threads for all interfaces */
-  for(auto it = ifToPacketEngine.begin(); it != ifToPacketEngine.end(); it++) {
+  for(auto it = ifToPacketEngine_.begin(); it != ifToPacketEngine_.end(); it++) {
     packetEngineThreads.push_back(std::thread(&Switch::startSniffing, this,
                                   it->first, &it->second));
   }
@@ -28,17 +28,30 @@ Switch::Switch(unsigned int myId) {
   /*
    * Create the queue pairs to handle the different queues
    */
-  packetTypeToQueue.insert(std::pair<unsigned short, Queue *>  
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
                         ((unsigned short) PacketType::SWITCH_REGISTRATION_ACK,
                           &switchRegRespQueue_));
-  packetTypeToQueue.insert(std::pair<unsigned short, Queue *>  
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
                         ((unsigned short) PacketType::HELLO, &helloQueue_));
+  /*
+   * Control Request Packets
+   */
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+        ((unsigned short) PacketType::REGISTRATION_REQ, &controlRequestQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+      ((unsigned short) PacketType::DEREGISTRATION_REQ, &controlRequestQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+        ((unsigned short) PacketType::SUBSCRIPTION_REQ, &controlRequestQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+       ((unsigned short) PacketType::DESUBSCRIPTION_REQ, &controlRequestQueue_));
+
   /* 
    * create the switch registration response
    * handler thread 
    */
   auto regRespthread = std::thread(&Switch::handleRegistrationResp, this);
   auto hellothread = std::thread(&Switch::handleHello, this);
+  auto controlPacketthread = std::thread(&Switch::handleControlRequest, this);
 
   auto nodeStatethread = std::thread(&Switch::nodeStateHandler, this);
 
@@ -52,8 +65,36 @@ Switch::Switch(unsigned int myId) {
    * send hello thread
    */
   auto sendHello = std::thread(&Switch::sendHello, this);
-  packetHandler_.processQueue(&packetTypeToQueue);
+  packetHandler_.processQueue(&packetTypeToQueue_);
 
+}
+
+/*
+ * Handle Control Packets from hosts
+ */
+void Switch::handleControlRequest() {
+  /* first one needs to be removed */
+  (void) controlRequestQueue_.packet_in_queue_.exchange(0,
+                                                    std::memory_order_consume);
+  while(true) {
+    auto pending = controlRequestQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) { 
+      std::unique_lock<std::mutex> lock
+                                    (controlRequestQueue_.packet_ready_mutex_); 
+      if( !controlRequestQueue_.packet_in_queue_) {
+        controlRequestQueue_.packet_ready_.wait(lock);
+      }
+      continue;
+    }
+    /* if no controller is attached just drop the control packets */
+    if (!registered_) {
+      continue;
+    }
+    auto entry = ifToPacketEngine_.find(controllerIf_);
+    /* TBD: Change the BUFLEN to the correct packet size */
+    entry->second.forward(pending->packet, BUFLEN);
+  }
 }
 
 /*
@@ -144,7 +185,7 @@ void Switch::handleRegistrationResp() {
     registered_ = true;
     /* no duplicates should go in the vector */
     if (std::find(nodeList_.begin(), nodeList_.end(), 
-                   helloPacket.nodeId) == nodeList_.end()) {
+                   regResponse.nodeId) == nodeList_.end()) {
       nodeList_.push_back(regResponse.nodeId);
     }
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
@@ -178,7 +219,7 @@ void Switch::sendHello() {
   memcpy(packet, &header, PACKET_HEADER_LEN);
   memcpy(packet + PACKET_HEADER_LEN, &helloPacketHeader, HELLO_HEADER_LEN);
   while (true) {
-    for (auto &entry : ifToPacketEngine) {
+    for (auto &entry : ifToPacketEngine_) {
       entry.second.send(packet, PACKET_HEADER_LEN + HELLO_HEADER_LEN);
     }
     sleep(1);
@@ -196,7 +237,7 @@ void Switch::sendRegistration() {
   memcpy(packet+PACKET_HEADER_LEN, &regPacketHeader, REGISTRATION_HEADER_LEN);
   while(true) {
     while (!registered_) {
-      for (auto &entry : ifToPacketEngine) {
+      for (auto &entry : ifToPacketEngine_) {
         entry.second.send(packet, PACKET_HEADER_LEN + REGISTRATION_HEADER_LEN);
       }
       sleep(2);

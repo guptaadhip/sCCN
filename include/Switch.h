@@ -31,20 +31,26 @@ class Switch{
    * Handle Registration Response from Controller
    */
   void handleRegistrationResp();
+
+  /*
+   * Handle Control Request Packets from host
+   */
+  void handleControlRequest();
+
   /*
    * Start receiving from interfaces
    */
   void startSniffing(std::string myInterface, PacketEngine *packetEngine);
 
  private:
-  std::unordered_map<std::string, PacketEngine> ifToPacketEngine;
+  std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
   MyInterfaces myInterface_;
   unsigned int myId_;
   unsigned int myController_;
   std::string controllerIf_;
   PacketHandler packetHandler_;
   bool registered_;
-  PacketTypeToQueue packetTypeToQueue;
+  PacketTypeToQueue packetTypeToQueue_;
 
   std::vector<unsigned int> nodeList_;
   std::unordered_map<unsigned int, bool> nodeToHello_;
@@ -55,4 +61,5 @@ class Switch{
    */
   Queue switchRegRespQueue_;
   Queue helloQueue_;
+  Queue controlRequestQueue_;
 };
