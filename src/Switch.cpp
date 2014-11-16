@@ -159,6 +159,66 @@ void Switch::handleData() {
     }
   }
 }
+
+/*
+ * Handle Control Response Packets from Controller
+ */
+void Switch::handleControlResponse() {
+  /* first one needs to be removed */
+  (void) controlResponseQueue_.packet_in_queue_.exchange(0,
+                                                    std::memory_order_consume);
+  while(true) {
+    auto pending = controlResponseQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) { 
+      std::unique_lock<std::mutex> lock
+                                    (controlResponseQueue_.packet_ready_mutex_); 
+      if( !controlResponseQueue_.packet_in_queue_) {
+        controlResponseQueue_.packet_ready_.wait(lock);
+      }
+      continue;
+    }
+    /* if no controller is attached just drop the control packets */
+    if (!registered_) {
+      continue;
+    }
+    /* if packet is not from the interface of the controller then drop it */
+    if (pending->interface.compare(controllerIf_) != 0) {
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+                "Got control response packet from the non controller interface:"
+                + pending->interface);
+      continue;
+    }
+    /* if all looks good lets forward the packet to the host */
+    struct ResponsePacketHeader respPacket;
+    bcopy(pending->packet + PACKET_HEADER_LEN, &respPacket,RESPONSE_HEADER_LEN);
+    /* If the nodeId is not in the list of known hosts then drop the packet */
+    if (std::find(connectedHostList_.begin(), connectedHostList_.end(), 
+                   respPacket.hostId) == connectedHostList_.end()) {
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+                "node id not found in the connectedHostlist: nodeId" 
+                + respPacket.hostId);
+      continue;
+    }
+    auto interface = nodeIdToIf_.find(respPacket.hostId);
+    /* no interface found to the node then lets drop the packet */
+    if (interface == nodeIdToIf_.end()) {
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+                "node id interface not found for host:" 
+                + respPacket.hostId);
+      continue;
+    }
+    auto entry = ifToPacketEngine_.find(interface->second);
+    if (entry == ifToPacketEngine_.end()) {
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+                "node interface PacketEngine not found:" 
+                + interface->second);
+      continue;
+    }
+    entry->second.forward(pending->packet, RESPONSE_HEADER_LEN);
+  }
+}
+
 /*
  * Handle Control Packets from hosts
  */

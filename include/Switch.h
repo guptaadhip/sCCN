@@ -39,6 +39,11 @@ class Switch{
   void handleRegistrationResp();
 
   /*
+   * Handle Control Response Packets from Controller
+   */
+  void handleControlResponse();
+
+  /*
    * Handle Control Request Packets from host
    */
   void handleControlRequest();
@@ -88,6 +93,7 @@ class Switch{
   Queue switchRegRespQueue_;
   Queue helloQueue_;
   Queue controlRequestQueue_;
+  Queue controlResponseQueue_;
   Queue dataQueue_;
   Queue ruleQueue_;
 };
