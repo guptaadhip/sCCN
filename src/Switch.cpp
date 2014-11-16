@@ -343,7 +343,6 @@ void Switch::nodeStateHandler() {
           connectedSwitchList_.erase(std::remove(connectedSwitchList_.begin(),
                                       connectedSwitchList_.end(), nodeId), 
                                       connectedSwitchList_.end());
-          nodeIdToIf_.erase(nodeId);
           /* Now send a delete network update to the controller */
           sendNetworkUpdate(UpdateType::DELETE_SWITCH, nodeId);
           /* Now remove the entry from the unique ID to interface map */
@@ -351,13 +350,13 @@ void Switch::nodeStateHandler() {
           Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                     "Switch: " + std::to_string(nodeId) + " is down");
         } else {
-          /* if the switch went down */
+          /* if the host went down */
           connectedHostList_.erase(std::remove(connectedHostList_.begin(),
                                       connectedHostList_.end(), nodeId), 
                                       connectedHostList_.end());
-          nodeIdToIf_.erase(nodeId);
           /* Now send a delete network update to the controller */
-          //sendNetworkUpdate(UpdateType::DELETE_HOST, nodeId, );
+          sendNetworkUpdate(UpdateType::DELETE_HOST, nodeId);
+          nodeIdToIf_.erase(nodeId);
           Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                     "Host: " + std::to_string(nodeId) + " is down");
         }
