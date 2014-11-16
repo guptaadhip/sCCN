@@ -48,6 +48,11 @@ class Controller {
    */
   void handleKeywordRegistration();
 
+  /*
+   * Handle Keyword Registration
+   */
+  void handleNetworkUpdate();
+
  private:
   unsigned int myId_;
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
@@ -69,4 +74,5 @@ class Controller {
   Queue helloQueue_;
   Queue registrationQueue_;
   Queue subscriptionQueue_;
+  Queue networkUpdateQueue_;
 };
