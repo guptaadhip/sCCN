@@ -152,8 +152,6 @@ void Switch::handleData() {
                     "Packet Engine not found for " + entry->second);
         continue;
       }
-      /* TBD: Change the BUFLEN to the correct packet size */
-      packetEngine->second.forward(pending->packet, BUFLEN);
       packetEngine->second.forward(pending->packet, 
                           dataHeader.len + DATA_HEADER_LEN + PACKET_HEADER_LEN);
     }
@@ -258,8 +256,8 @@ void Switch::handleControlRequest() {
                 "New Host found: " + std::to_string(reqPacket.hostId));
     }
     auto entry = ifToPacketEngine_.find(controllerIf_);
-    /* TBD: Change the BUFLEN to the correct packet size */
-    entry->second.forward(pending->packet, BUFLEN);
+    entry->second.forward(pending->packet, reqPacket.len 
+                          + REQUEST_HEADER_LEN + PACKET_HEADER_LEN);
   }
 }
 
