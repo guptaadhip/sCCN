@@ -31,7 +31,7 @@ class Switch{
   /*
    * Function to send Network Update to Controller
    */
-  void sendNetworkUpdate(UpdateType, unsigned int, std::string);
+  void sendNetworkUpdate(UpdateType, unsigned int);
 
   /*
    * Handle Registration Response from Controller
