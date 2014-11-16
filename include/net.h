@@ -71,14 +71,22 @@ struct RequestPacketHeader {
 };
 
 /*
- * Packet Structure of the Registration Packet
+ * Structure of the Response packet from controller to host
+ */
+struct ResponsePacketHeader {
+  unsigned int sequenceNo;
+  unsigned int uniqueId;
+};
+
+/*
+ * Packet Structure of the Switch Registration Packet to Controller
  */
 struct RegistrationPacketHeader {
   unsigned int nodeId;
 };
 
 /*
- * Registration Response Packet Structure
+ * Switch Registration Response Packet Structure from Controller
  */
 struct RegistrationResponsePacketHeader {
   unsigned int nodeId;
@@ -109,13 +117,6 @@ struct NetworkUpdatePacketHeader {
   std::string interface;
 };
 
-/*
- * Structure of the Response packet from controller to host
- */
-struct ResponsePacketHeader {
-  unsigned int sequenceNo;
-  unsigned int uniqueId;
-};
 
 /* 
  * Structure of the Data Packet
