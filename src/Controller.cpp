@@ -44,6 +44,8 @@ Controller::Controller(unsigned int myId) {
            ((unsigned short) PacketType::SWITCH_REGISTRATION, &switchRegQueue_));
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
            ((unsigned short) PacketType::HELLO, &helloQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
+           ((unsigned short) PacketType::NETWORK_UPDATE, &networkUpdateQueue_));
 
   /* Registration/Deregistration queue */
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
@@ -63,6 +65,7 @@ Controller::Controller(unsigned int myId) {
   auto helloHandlerThread = std::thread(&Controller::handleHello, this);
   auto switchStateThread = std::thread(&Controller::switchStateHandler, this);
   auto helloThread = std::thread(&Controller::sendHello, this);
+  auto networkUpdateThread = std::thread(&Controller::handleNetworkUpdate, this);
   packetHandler_.processQueue(&packetTypeToQueue_);
   /* waiting for all the packet engine threads */
   for (auto& joinThreads : packetEngineThreads) joinThreads.join();
@@ -196,6 +199,32 @@ void Controller::handleSwitchRegistration() {
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "received registration packet from " + pending->interface
                 + " node: " + std::to_string(regPacket.nodeId));
+  }
+}
+
+/*
+ * Handle Network Update messages coming from switches 
+ */
+void Controller::handleNetworkUpdate() {
+  /* first one needs to be removed */
+  (void) networkUpdateQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
+  while(true) {
+    auto pending = networkUpdateQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) { 
+      std::unique_lock<std::mutex> lock(networkUpdateQueue_.packet_ready_mutex_);    
+      if( !networkUpdateQueue_.packet_in_queue_) {
+        networkUpdateQueue_.packet_ready_.wait(lock);
+      }
+      continue;
+    }
+    struct NetworkUpdatePacketHeader networkUpdatePacket;
+    bcopy(pending->packet + PACKET_HEADER_LEN, &networkUpdatePacket, NETWORK_UPDATE_HEADER_LEN);
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+      "Received network update handling packet from: " + pending->interface + 
+      "regarding" + std::to_string(networkUpdatePacket.nodeId));
+    /* TBD : Write the code for network Update handling and
+     changing the network map */
   }
 }
 
