@@ -181,6 +181,22 @@ void Switch::handleControlRequest() {
     if (!registered_) {
       continue;
     }
+    struct RequestPacketHeader reqPacket;
+    bcopy(pending->packet + PACKET_HEADER_LEN, &reqPacket, REQUEST_HEADER_LEN);
+    /* no duplicates should go in the vector */
+    if (std::find(nodeList_.begin(), nodeList_.end(), 
+                   reqPacket.hostId) == nodeList_.end()) {
+      nodeList_.push_back(reqPacket.hostId);
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "New Node found: " + std::to_string(reqPacket.hostId));
+    }
+    if (std::find(connectedHostList_.begin(), connectedHostList_.end(), 
+                   reqPacket.hostId) == connectedHostList_.end()) {
+      connectedHostList_.push_back(reqPacket.hostId);
+      /* TBD: send network update */
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "New Host found: " + std::to_string(reqPacket.hostId));
+    }
     auto entry = ifToPacketEngine_.find(controllerIf_);
     /* TBD: Change the BUFLEN to the correct packet size */
     entry->second.forward(pending->packet, BUFLEN);
@@ -213,8 +229,15 @@ void Switch::handleHello() {
     if (std::find(nodeList_.begin(), nodeList_.end(), 
                    helloPacket.nodeId) == nodeList_.end()) {
       nodeList_.push_back(helloPacket.nodeId);
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "New Node found: " + std::to_string(helloPacket.nodeId));
     }
-    
+    /* controller and host then continue as already added in the lists */
+    if (helloPacket.nodeId == myController_ || 
+        std::find(connectedHostList_.begin(), connectedHostList_.end(),
+          helloPacket.nodeId) != connectedHostList_.end()) {
+      continue;
+    }  
     /* no duplicates should go in the list of connected switches */
     if (std::find(connectedSwitchList_.begin(), connectedSwitchList_.end(),
                   helloPacket.nodeId) == connectedSwitchList_.end()) {
@@ -222,10 +245,12 @@ void Switch::handleHello() {
       nodeIdToIf_.insert(std::pair<unsigned int, std::string> 
                           (helloPacket.nodeId, pending->interface));
       sendNetworkUpdate(UpdateType::ADD_SWITCH, helloPacket.nodeId);
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "New Switch found: " + std::to_string(helloPacket.nodeId));
     }
     
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                "Received hello from: " + std::to_string(helloPacket.nodeId));
+    //Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+    //            "Received hello from: " + std::to_string(helloPacket.nodeId));
   }
 }
 
@@ -254,19 +279,30 @@ void Switch::nodeStateHandler() {
           registered_ = false;
           Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                     "Controller: " + std::to_string(nodeId) + " is down");
-        } else if (std::find(connectedSwitchList_.begin(), connectedSwitchList_.end(),
-                      nodeId) != connectedSwitchList_.end()) {
-          /* if the switch went down, remove it from switch list */
+        } else if (std::find(connectedSwitchList_.begin(), 
+            connectedSwitchList_.end(), nodeId) != connectedSwitchList_.end()) {
+          /* if the switch went down */
           connectedSwitchList_.erase(std::remove(connectedSwitchList_.begin(),
-                        connectedSwitchList_.end(), nodeId), connectedSwitchList_.end());
+                                      connectedSwitchList_.end(), nodeId), 
+                                      connectedSwitchList_.end());
+          nodeIdToIf_.erase(nodeId);
           /* Now send a delete network update to the controller */
           sendNetworkUpdate(UpdateType::DELETE_SWITCH, nodeId);
           /* Now remove the entry from the unique ID to interface map */
           nodeIdToIf_.erase(nodeId);
           Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                     "Switch: " + std::to_string(nodeId) + " is down");
+        } else {
+          /* if the switch went down */
+          connectedHostList_.erase(std::remove(connectedHostList_.begin(),
+                                      connectedHostList_.end(), nodeId), 
+                                      connectedHostList_.end());
+          nodeIdToIf_.erase(nodeId);
+          /* Now send a delete network update to the controller */
+          //sendNetworkUpdate(UpdateType::DELETE_HOST, nodeId, );
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                    "Host: " + std::to_string(nodeId) + " is down");
         }
-        /* else if the host went down */
       }
     }
     sleep(1);
