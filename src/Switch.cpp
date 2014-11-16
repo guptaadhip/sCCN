@@ -219,8 +219,8 @@ void Switch::handleHello() {
     if (std::find(connectedSwitchList_.begin(), connectedSwitchList_.end(),
                   helloPacket.nodeId) == connectedSwitchList_.end()) {
       connectedSwitchList_.push_back(helloPacket.nodeId);
-      std::pair<unsigned int, std::string> UIdIfPair (helloPacket.nodeId, pending->interface);
-      nodeUIdToIf_.insert(UIdIfPair);
+      nodeIdToIf_.insert(std::pair<unsigned int, std::string> 
+                          (helloPacket.nodeId, pending->interface));
     }
     
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
@@ -253,13 +253,12 @@ void Switch::nodeStateHandler() {
           registered_ = false;
           Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                     "Controller: " + std::to_string(nodeId) + " is down");
-        }
-        /* if the switch went down */
-        else if (std::find(connectedSwitchList_.begin(), connectedSwitchList_.end(),
+        } else if (std::find(connectedSwitchList_.begin(), connectedSwitchList_.end(),
                       nodeId) != connectedSwitchList_.end()) {
+          /* if the switch went down */
           connectedSwitchList_.erase(std::remove(connectedSwitchList_.begin(),
                         connectedSwitchList_.end(), nodeId), connectedSwitchList_.end());
-          nodeUIdToIf_.erase(nodeId);
+          nodeIdToIf_.erase(nodeId);
           
           /* Now send a delete network update to the controller */
           //sendNetworkUpdate(UpdateType::DELETE, nodeId, );

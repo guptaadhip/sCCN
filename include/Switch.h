@@ -80,7 +80,7 @@ class Switch{
   std::vector<unsigned int> connectedSwitchList_;
   std::vector<unsigned int> connectedHostList_;
   /* a map from unique ID of node (may be host or switch) to interface */
-  std::unordered_map<unsigned int, std::string> nodeUIdToIf_;
+  std::unordered_map<unsigned int, std::string> nodeIdToIf_;
   
   /*
    * Queues for the handler threads
