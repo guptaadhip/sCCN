@@ -79,7 +79,7 @@ class Switch{
   std::unordered_multimap<unsigned int, std::string> forwardingTable_;
   std::vector<unsigned int> connectedSwitchList_;
   std::vector<unsigned int> connectedHostList_;
-  /* Its a map from unique ID of node (may be host or switch) to interface */
+  /* a map from unique ID of node (may be host or switch) to interface */
   std::unordered_map<unsigned int, std::string> nodeUIdToIf_;
   
   /*

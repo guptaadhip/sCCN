@@ -100,18 +100,10 @@ void Switch::handleRuleUpdate() {
     bcopy(pending->packet + PACKET_HEADER_LEN, &ruleHeader, RULE_UPDATE_HEADER_LEN);
     if ((int) ruleHeader.type == (int) UpdateType::ADD) {
       /* add rule to the forwarding table */
-      forwardingTable_.insert(std::pair<unsigned int, std::string>(
-                             ruleHeader.uniqueId, ruleHeader.interface));
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                  "adding rule: " + std::to_string(ruleHeader.uniqueId) 
-                  + " " + ruleHeader.interface);
+                  "write the code to add");
+
     } else if ((int) ruleHeader.type == (int) UpdateType::DELETE) {
-      auto entries = forwardingTable_.equal_range(ruleHeader.uniqueId);
-      for (auto entry = entries.first; entry != entries.second; ++entry) {
-        if(entry->second.compare(ruleHeader.interface) == 0) {
-          forwardingTable_.erase(entry);
-        }
-      }
       /* delete rule to the forwarding table */
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "write the code to delete");
