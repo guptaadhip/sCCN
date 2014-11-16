@@ -13,9 +13,9 @@ CC       = g++
 # compiling flags here
 CFLAGS   = -std=c++11 -Wall -I. $(CPFRING) -pthread -ggdb
 
-LINKER   = g++ -o
+LINKER   = g++ -O2 -Wl,--no-as-needed -o
 # linking flags here
-LFLAGS   = -Wall -I. $(CPFRING) $(LPFRING) $(LPCAP) -lm -ggdb -lrt -lnuma -pthread
+LFLAGS   = -Wall -I. $(CPFRING)
 
 SRCDIR   = src
 INCLUDEDIR   = include
@@ -30,7 +30,7 @@ rm       = rm -f
 
 $(BINDIR)/$(TARGET): $(OBJECTS)
 	mkdir -p $(BINDIR)
-	$(LINKER) $@ $(LFLAGS) $(OBJECTS)
+	$(LINKER) $@ $(LFLAGS) $(OBJECTS) $(LPFRING) $(LPCAP) -lm -ggdb -lnuma -pthread -lrt
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.cpp
 	mkdir -p $(OBJDIR)
