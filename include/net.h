@@ -46,8 +46,12 @@ enum class PacketType: unsigned short {
  * and controller to switch (rule installation) 
  */
 enum class UpdateType : unsigned char {
-  ADD = 0xA,
-  DELETE = 0xB,
+  ADD_SWITCH = 0xA0,
+  DELETE_SWITCH = 0xB0,
+  ADD_HOST = 0xA1,
+  DELETE_HOST = 0xB1,
+  ADD_RULE = 0xA2,
+  DELETE_RULE = 0xB2,
 };
 
 /*
