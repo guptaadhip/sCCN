@@ -214,6 +214,15 @@ void Switch::handleHello() {
                    helloPacket.nodeId) == nodeList_.end()) {
       nodeList_.push_back(helloPacket.nodeId);
     }
+    
+    /* no duplicates should go in the list of connected switches */
+    if (std::find(connectedSwitchList_.begin(), connectedSwitchList_.end(),
+                  helloPacket.nodeId) == connectedSwitchList_.end()) {
+      connectedSwitchList_.push_back(helloPacket.nodeId);
+      std::pair<unsigned int, std::string> UIdIfPair (helloPacket.nodeId, pending->interface);
+      nodeUIdToIf_.insert(UIdIfPair);
+    }
+    
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "Received hello from: " + std::to_string(helloPacket.nodeId));
   }
@@ -244,15 +253,54 @@ void Switch::nodeStateHandler() {
           registered_ = false;
           Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                     "Controller: " + std::to_string(nodeId) + " is down");
-        } else {
+        }
+        /* if the switch went down */
+        else if (std::find(connectedSwitchList_.begin(), connectedSwitchList_.end(),
+                      nodeId) != connectedSwitchList_.end()) {
+          connectedSwitchList_.erase(std::remove(connectedSwitchList_.begin(),
+                        connectedSwitchList_.end(), nodeId), connectedSwitchList_.end());
+          nodeUIdToIf_.erase(nodeId);
+          
+          /* Now send a delete network update to the controller */
+          //sendNetworkUpdate(UpdateType::DELETE, nodeId, );
           Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                     "Switch: " + std::to_string(nodeId) + " is down");
         }
+        /* else if the host went down */
       }
     }
     sleep(1);
   }
 }
+
+/*
+ * Send Network Update to Controller
+ */
+/*void Switch::sendNetworkUpdate(UpdateType updateType, unsigned int nodeId, std::string interface) {
+  char packet[PACKET_HEADER_LEN + NETWORK_UPDATE_HEADER_LEN];
+  bzero(packet, PACKET_HEADER_LEN + NETWORK_UPDATE_HEADER_LEN);
+  struct PacketTypeHeader header;
+  header.packetType = PacketType::NETWORK_UPDATE;
+  struct NetworkUpdatePacketHeader networkUpdatePacketHeader;
+  
+  // filling the update packet header 
+  networkUpdatePacketHeader.type = updateType;
+  networkUpdatePacketHeader.nodeId = nodeId;
+  networkUpdatePacketHeader.interface = interface;
+  
+  memcpy(packet, &header, PACKET_HEADER_LEN);
+  memcpy(packet + PACKET_HEADER_LEN, &networkUpdatePacketHeader, NETWORK_UPDATE_HEADER_LEN);
+  
+  // check if the switch is registered /
+  if(!registered_) {
+    Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
+                "Switch is not registered with any controller");
+  } else {
+    auto packetEngine = ifToPacketEngine_.find(controllerIf_);
+    packetEngine.send(packet, PACKET_HEADER_LEN + NETWORK_UPDATE_HEADER_LEN);
+  }
+}*/
+
 
 void Switch::handleRegistrationResp() {
   /* first one needs to be removed */

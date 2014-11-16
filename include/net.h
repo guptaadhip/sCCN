@@ -102,7 +102,7 @@ struct HelloPacketHeader {
 struct NetworkUpdatePacketHeader {
   UpdateType type;
   unsigned int nodeId;
-  unsigned short port;
+  std::string interface;
 };
 
 /*

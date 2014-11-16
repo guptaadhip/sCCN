@@ -4,6 +4,7 @@
 #include "include/PacketEngine.h"
 #include "include/PacketHandler.h"
 #include "include/Queue.h"
+#include "include/net.h"
 
 class Switch{
  public:
@@ -26,6 +27,11 @@ class Switch{
    * Thead to manage Switch State based on the hello message received
    */
   void nodeStateHandler();
+  
+  /*
+   * Function to send Network Update to Controller
+   */
+  void sendNetworkUpdate(UpdateType, unsigned int, std::string);
 
   /*
    * Handle Registration Response from Controller
@@ -70,7 +76,12 @@ class Switch{
   std::vector<unsigned int> nodeList_;
   std::unordered_map<unsigned int, bool> nodeToHello_;
   std::unordered_map <unsigned int, int> nodeToHelloCount_;
-  std::unordered_multimap<unsigned int, std::string> forwardingTable_; 
+  std::unordered_multimap<unsigned int, std::string> forwardingTable_;
+  std::vector<unsigned int> connectedSwitchList_;
+  std::vector<unsigned int> connectedHostList_;
+  /* Its a map from unique ID of node (may be host or switch) to interface */
+  std::unordered_map<unsigned int, std::string> nodeUIdToIf_;
+  
   /*
    * Queues for the handler threads
    */
