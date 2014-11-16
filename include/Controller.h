@@ -11,10 +11,6 @@ class Controller {
  public:
   Controller(unsigned int id);
   /*
-   * Function to receive hello from the switches
-   */
-  void recvHello();
-  /*
    * Get my id
    */
   unsigned int getId() const;
@@ -44,12 +40,12 @@ class Controller {
   void handleSwitchRegistration();
 
   /*
-   * Handle Keyword Registration
+   * TBD : Handle Keyword Registration
    */
   void handleKeywordRegistration();
 
   /*
-   * Handle Keyword Registration
+   * TBD : Handle Keyword Registration
    */
   void handleNetworkUpdate();
 
@@ -69,7 +65,6 @@ class Controller {
   /* 
    * Queues for the handler threads
    */
-  Queue regQueue_;
   Queue switchRegQueue_;
   Queue helloQueue_;
   Queue registrationQueue_;

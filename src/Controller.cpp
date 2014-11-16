@@ -39,8 +39,6 @@ Controller::Controller(unsigned int myId) {
    * create queue objects for the different handler threads
    */
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
-                    ((unsigned short) PacketType::REGISTRATION_REQ, &regQueue_));
-  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
            ((unsigned short) PacketType::SWITCH_REGISTRATION, &switchRegQueue_));
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
            ((unsigned short) PacketType::HELLO, &helloQueue_));
