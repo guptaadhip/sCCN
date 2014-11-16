@@ -43,6 +43,11 @@ class Controller {
    */
   void handleSwitchRegistration();
 
+  /*
+   * Handle Keyword Registration
+   */
+  void handleKeywordRegistration();
+
  private:
   unsigned int myId_;
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
@@ -55,10 +60,13 @@ class Controller {
   std::unordered_map<unsigned int, std::string> switchToIf_;
   std::unordered_map<unsigned int, bool> switchToHello_;
   std::unordered_map <unsigned int, int> switchToHelloCount_;
+
   /* 
    * Queues for the handler threads
    */
   Queue regQueue_;
   Queue switchRegQueue_;
   Queue helloQueue_;
+  Queue registrationQueue_;
+  Queue subscriptionQueue_;
 };

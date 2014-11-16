@@ -86,7 +86,7 @@ struct RegistrationResponsePacketHeader {
 struct RuleUpdatePacketHeader {
   UpdateType type;
   unsigned int uniqueId;
-  unsigned short port;
+  std::string interface;
 };
 
 /*
