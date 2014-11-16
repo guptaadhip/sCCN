@@ -45,6 +45,11 @@ class Controller {
   void handleKeywordRegistration();
 
   /*
+   * TBD : Handle Keyword Subscription
+   */
+  void handleKeywordSubscription();
+
+  /*
    * TBD : Handle Keyword Registration
    */
   void handleNetworkUpdate();
@@ -61,6 +66,13 @@ class Controller {
   std::unordered_map<unsigned int, std::string> switchToIf_;
   std::unordered_map<unsigned int, bool> switchToHello_;
   std::unordered_map <unsigned int, int> switchToHelloCount_;
+
+  /* 
+   * Data Structures to store the keyword to unique ID mapping
+   */
+  std::unordered_map<std::string, unsigned int> keywordsToUniqueId;
+  /* single keyword to unique Id */
+  std::unordered_multimap<std::string, unsigned int> keywordToUniqueIds;
 
   /* 
    * Queues for the handler threads
