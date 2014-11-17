@@ -5,6 +5,7 @@
 #include "include/Logger.h"
 #include "include/Switch.h"
 #include "include/Controller.h"
+#include "include/Host.h"
 
 extern bool DEBUG_MODE;
 
@@ -34,6 +35,7 @@ int main(int argc, char *argv[]) {
     Controller controller(myId);
   } else if (role.compare("Host") == 0) {
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Role: Host");
+    Host host(myId);
   } else {
     Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
                 "incorrect role specified");
