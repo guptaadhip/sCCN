@@ -1,28 +1,15 @@
 #pragma once
-#include <random>
-#include <limits>
-#include <ctime>
+#ifndef __UTIL_H_INCLUDED__
+#define __UTIL_H_INCLUDED__
 
 /*
  * Random sequence number generator based on the time
  */
-unsigned int sequenceNumberGen() {
-  typedef std::mt19937 RNGType;
-  RNGType rng;
-  rng.seed(time(NULL));
-  std::uniform_int_distribution<unsigned int> seqNo(1, 
-                            std::numeric_limits<unsigned int>::max());
-  return (unsigned int) seqNo(rng);
-}
+unsigned int sequenceNumberGen();
 
 /*
  * Unique Id Generator (minimum unique ID is 100) 
  * for the first time we need to pass 0 as the last unique ID
  */
-unsigned int uniqueIdGenerator(unsigned int lastUniqueId) {
-  if (lastUniqueId == 0) {
-    return 100;
-  } else {
-    return lastUniqueId++;
-  }
-}
+unsigned int uniqueIdGenerator(unsigned int lastUniqueId);
+#endif 
