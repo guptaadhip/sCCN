@@ -1,4 +1,5 @@
 #include "include/Controller.h"
+#include "include/ControllerInterface.h"
 #include "include/net.h"
 #include "include/Logger.h"
 #include "include/MyInterfaces.h"
@@ -34,6 +35,13 @@ Controller::Controller(unsigned int myId) {
     packetEngineThreads.push_back(std::thread(&Controller::startSniffing, this,
                                   it->first, &it->second));
   }
+
+  /*
+   * Create the controller exteral interface object
+   */
+  ControllerInterface controllerInterface(this);
+  std::thread controllerInterfaceThread = std::thread(
+                        &ControllerInterface::readSocket, controllerInterface);
 
   /* 
    * create queue objects for the different handler threads

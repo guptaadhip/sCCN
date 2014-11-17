@@ -21,7 +21,7 @@ if os.path.exists( "/tmp/controllerSocket" ):
           break
         data = client.recv(2048);
         if x == "show controller id":
-          print "My Id: " + data
+          print "Controller Id: " + data
         else:
           print "Invalid command";
     except KeyboardInterrupt, k:
