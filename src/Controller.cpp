@@ -117,8 +117,8 @@ void Controller::handleHello() {
     switchToHello_[helloPacket.nodeId] = true;
     /* Set counter to 0 */
     switchToHelloCount_[helloPacket.nodeId] = 0;
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                "Received hello from: " + std::to_string(helloPacket.nodeId));
+    //Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+    //            "Received hello from: " + std::to_string(helloPacket.nodeId));
   }
 }
 
