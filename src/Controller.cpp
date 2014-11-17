@@ -248,3 +248,7 @@ void Controller::startSniffing(std::string myInterface,
     }
   }
 }
+
+unsigned int Controller::getId() const {
+  return myId_; 
+}

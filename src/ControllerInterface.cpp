@@ -10,7 +10,7 @@
 #include <cstring>
 #include <unordered_map>
 
-char PATH[] = "/tmp/controllerSocket";
+char PATH_CONTROLLER[] = "/tmp/controllerSocket";
 
 ControllerInterface::ControllerInterface(Controller *controller) {
   controller_ = controller;
@@ -22,8 +22,8 @@ void ControllerInterface::readSocket() {
   socklen_t remoteLen;
   bzero(&local, sizeof(local));
   local.sun_family = AF_UNIX;
-  strncpy(local.sun_path, PATH, 104);
-  unlink(PATH);
+  strncpy(local.sun_path, PATH_CONTROLLER, 104);
+  unlink(PATH_CONTROLLER);
   if ((socket_ = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
     Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
                 "Unable to create the ControllerInterface Socket");
@@ -32,7 +32,7 @@ void ControllerInterface::readSocket() {
     return;
   }
   Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-                "Listening at path: " + std::string(PATH));
+                "Listening at path: " + std::string(PATH_CONTROLLER));
   if (bind(socket_, (struct sockaddr *) &local, sizeof(local)) == -1) {
     Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
                       "ControllerInterface Socket bind failed: " 
