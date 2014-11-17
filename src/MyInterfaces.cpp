@@ -11,6 +11,11 @@ MyInterfaces::MyInterfaces() {
   struct ifaddrs *ifa = NULL;
   getifaddrs(&ifAddrStruct_);
   for (ifa = ifAddrStruct_; ifa != NULL; ifa = ifa->ifa_next) {
+    /* The interface needs to have either IPv4 or IPv6 address */
+    if (ifa->ifa_addr->sa_family != AF_INET && 
+        ifa->ifa_addr->sa_family != AF_INET6) { 
+      continue;
+    }
     std::string interface = std::string(ifa->ifa_name);
     /* dont add loopback interface to the list */
     if (interface.compare("lo") == 0 || interface.compare("eth0") == 0) {
