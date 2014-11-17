@@ -1,34 +1,30 @@
 #pragma once
 
-class Switch; 
+class Controller; 
 
-class SwitchInterface {
+class ControllerInterface {
  public:
   /* 
-   * Switch Interface Constructor 
+   * Controller Interface Constructor 
    */
-  SwitchInterface(Switch *mySwitch); 
+  ControllerInterface(Controller *controller); 
 
   /*
    * Destructor to kill the sockets
    */
-  ~SwitchInterface();
+  ~ControllerInterface();
   /* 
    * initialize and read from the Unix Socket 
    */
   void readSocket();
-  /* 
-   * Respond with the forwarding table of the switch
-   */
-  void sendForwardTable();
   /*
    * Send data over the socket
    */
   void sendData(char *data, int len);
 
  private:
-  /* Switch object */
-  Switch *switch_;
+  /* Controller object */
+  Controller *controller_;
   int socket_;
   int cliSocket_;
 };
