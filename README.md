@@ -38,6 +38,8 @@ Running
 sudo bin/sccn 1 Controller dbg<br><br>
 2) Switch: <br>
 sudo bin/sccn 2 Switch dbg<br><br>
+3) Switch CLI interface: (On switch node)<br>
+sudo python switchInterface.py<br>
 
 Proposal
 ========

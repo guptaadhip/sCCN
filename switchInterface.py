@@ -16,6 +16,7 @@ if os.path.exists( "/tmp/switchSocket" ):
   while True:
     try:
       x = raw_input( "> " )
+      x = x.strip()
       if "" != x:
         client.send( x ) 
         if "quit" == x:
@@ -28,12 +29,15 @@ if os.path.exists( "/tmp/switchSocket" ):
           if data == "0":
             print "No entries in the forwarding table"
             continue
+          print ("Unique Id : Interface");
           count = 0;
           while (count < data):
             # If entries exist lets read them
             data = client.recv(2048);
             # need to handle this data correctly
-            print data
+            uid = data[:4]
+            data = data[data:]
+            print uid + " : " +  data
             count = count + 1
         elif x == "show controller id":
           if data == "0":
