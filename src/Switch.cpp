@@ -1,5 +1,6 @@
 #include "include/Switch.h"
 #include "include/PacketEngine.h"
+#include "include/SwitchInterface.h"
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -13,6 +14,7 @@ using namespace std;
 Switch::Switch(unsigned int myId) {
   registered_ = false;
   myId_ = myId;
+  myController_ = 0;
   std::vector<std::thread> packetEngineThreads;
   for(auto &interface : myInterface_.getInterfaceList()) {
     PacketEngine packetEngine(interface, myId, &packetHandler_);
@@ -24,6 +26,12 @@ Switch::Switch(unsigned int myId) {
     packetEngineThreads.push_back(std::thread(&Switch::startSniffing, this,
                                   it->first, &it->second));
   }
+
+  /*
+   * Create the switch exteral interface object
+   */
+  SwitchInterface switchInterface(this);
+  std::thread switchInterfaceThread = std::thread(&SwitchInterface::readSocket, switchInterface);
 
   /*
    * Create the queue pairs to handle the different queues
@@ -477,4 +485,30 @@ void Switch::sendRegistration() {
   }
 }
 
+/*
+ * Return the controller Id
+ */
+unsigned int Switch::getControllerId() const {
+  return myController_;
+}
 
+/*
+ * Return the controller Interface
+ */
+std::string Switch::getControllerIf() const {
+  return controllerIf_;
+}
+
+/*
+ * Return the switch Id
+ */
+unsigned int Switch::getSwitchId() const {
+  return myId_;
+}
+
+/*
+ * Return the switch forwarding table
+ */
+std::unordered_multimap<unsigned int, std::string> Switch::getForwardingTable() const {
+  return forwardingTable_;
+}

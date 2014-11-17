@@ -68,6 +68,26 @@ class Switch{
    */
   void printForwardingTable();
 
+  /*
+   * Return the switch Id
+   */
+  unsigned int getSwitchId() const;
+
+  /*
+   * Return the controller Id
+   */
+  unsigned int getControllerId() const;
+  
+  /*
+   * Return the controller Interface
+   */
+  std::string getControllerIf() const;
+  
+  /*
+   * Returns the switch forwarding table
+   */
+  std::unordered_multimap<unsigned int, std::string> getForwardingTable() const;
+
  private:
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
   MyInterfaces myInterface_;
