@@ -433,8 +433,9 @@ void Host::handleRegistrationResponsePacket(){
 
 		if(packetTypeHeader.packetType == PacketType::REGISTRATION_ACK){
 			/* Save the keyword and UniqueID */
+      /* ADHIP: NEED TO CHANGE */
 			publisherKeywordData_.addKeywordIDPair(keyword, 
-			responsePacketHeader.uniqueId);
+			responsePacketHeader.len);
 			/* Print Registration Success Message on STDOUT */
 			userInterfaceLock_.lock();
 			std::cout << "Registered Keyword:: " << keyword << std::endl;
@@ -533,8 +534,9 @@ void Host::handleSubscribeResponsePacket(){
 
 		if(packetTypeHeader.packetType == PacketType::SUBSCRIPTION_ACK){
 			/* Save the keyword and UniqueID */
+      /* ADHIP: NEED TO CHANGE */
 			subscriberKeywordData_.addKeyword(keyword, 
-			responsePacketHeader.uniqueId);
+			responsePacketHeader.len);
 			sendHelloCounter_++;
 			/* Print Subscribe Success Message on STDOUT */
 			userInterfaceLock_.lock();

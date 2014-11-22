@@ -76,7 +76,7 @@ struct RequestPacketHeader {
 struct ResponsePacketHeader {
   unsigned int sequenceNo;
   unsigned int hostId;
-  unsigned int uniqueId;
+  unsigned int len;
 };
 
 /*

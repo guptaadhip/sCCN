@@ -61,6 +61,7 @@ class Controller {
   MyInterfaces myInterfaces_;
   PacketHandler packetHandler_;
   PacketTypeToQueue packetTypeToQueue_;
+  unsigned int lastUniqueId_;
 
   /* all switch based data structures */
   std::vector<unsigned int> switchList_;
@@ -69,11 +70,25 @@ class Controller {
   std::unordered_map <unsigned int, int> switchToHelloCount_;
 
   /* 
-   * Data Structures to store the keywords to unique ID mapping
+   * Data Structure to store the keywords to unique ID mapping
    */
-  std::unordered_map<std::string, unsigned int> keywordsToUniqueId;
-  /* single keyword to unique Id */
-  std::unordered_map<std::string, std::set<unsigned int> > keywordToUniqueIds;
+  std::unordered_map<std::string, unsigned int> keywordsToUniqueId_;
+  /* 
+   * Data Structure to store the keyword to unique IDs mapping
+   */
+  std::unordered_map<std::string, std::set<unsigned int> > keywordToUniqueIds_;
+  /* 
+   * Data Structure to store the keywords to subscriber count
+  */
+  std::unordered_map<std::string, unsigned int> keywordToCount_;
+  /* 
+   * Data Structure to store the keyword to list of publishers
+  */
+  std::unordered_map<std::string, std::set<unsigned int> > keywordToPublishers_;
+  /* 
+   * Data Structure to store the keyword to list of subscribers
+  */
+  std::unordered_map<std::string, std::set<unsigned int> > keywordToSubscribers_;
 
   /* 
    * Queues for the handler threads
