@@ -389,7 +389,7 @@ void Controller::handleKeywordRegistration()
             } else {
               /* send nack */
               Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-                          "Controller Strutures inconsistent sending NACK");
+                          "Controller Structures inconsistent sending NACK");
               /* Send Nack */
               responsePacketHeader.len = 0;
               replyPacketTypeHeader.packetType = PacketType::REGISTRATION_NACK;
