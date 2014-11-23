@@ -60,6 +60,26 @@ Switch::Switch(unsigned int myId) {
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
        ((unsigned short) PacketType::DESUBSCRIPTION_REQ, &controlRequestQueue_));
 
+  /*
+   * Control Response Packets
+   */
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+     ((unsigned short) PacketType::REGISTRATION_ACK, &controlResponseQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+     ((unsigned short) PacketType::DEREGISTRATION_ACK, &controlResponseQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+     ((unsigned short) PacketType::SUBSCRIPTION_ACK, &controlResponseQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+     ((unsigned short) PacketType::DESUBSCRIPTION_ACK, &controlResponseQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+     ((unsigned short) PacketType::REGISTRATION_NACK, &controlResponseQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+     ((unsigned short) PacketType::DEREGISTRATION_NACK, &controlResponseQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+     ((unsigned short) PacketType::SUBSCRIPTION_NACK, &controlResponseQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+     ((unsigned short) PacketType::DESUBSCRIPTION_NACK, &controlResponseQueue_));
+
   /* 
    * create the switch registration response
    * handler thread 
@@ -67,6 +87,7 @@ Switch::Switch(unsigned int myId) {
   auto regRespthread = std::thread(&Switch::handleRegistrationResp, this);
   auto hellothread = std::thread(&Switch::handleHello, this);
   auto controlPacketthread = std::thread(&Switch::handleControlRequest, this);
+  auto controlResthread = std::thread(&Switch::handleControlResponse, this);
   auto dataPacketthread = std::thread(&Switch::handleData, this);
   auto rulethread = std::thread(&Switch::handleRuleUpdate, this);
   auto hostRegthread = std::thread(&Switch::handleHostRegistration, this);
