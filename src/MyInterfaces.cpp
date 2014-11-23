@@ -18,9 +18,19 @@ MyInterfaces::MyInterfaces() {
     }
     std::string interface = std::string(ifa->ifa_name);
     /* dont add loopback interface to the list */
-    if (interface.compare("lo") == 0 || interface.compare("eth0") == 0) {
+    if (interface.compare("lo") == 0) {
       continue;
     }
+    /* for local vms */
+    if (interface.compare("eth0") == 0) {
+      continue;
+    }
+    /* removing the control interface */
+    /* Uncomment if running on deter and comment the above one
+    unsigned int ipAdr = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
+    if ((ipAdr & 0x0000ffff) == CONTROL_NW_IP) {
+      continue;
+    }*/
     interfaces_.push_back(interface);
   }
   sort(interfaces_.begin(), interfaces_.end());

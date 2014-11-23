@@ -6,6 +6,7 @@
 
 static const int BUFLEN = 1470;
 
+static const uint32_t CONTROL_NW_IP = 0x0000A8C0; /* Deter control Nw IP */
 
 /*
  * Task Structure
