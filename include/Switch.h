@@ -27,7 +27,13 @@ class Switch{
    * Thead to manage Switch State based on the hello message received
    */
   void nodeStateHandler();
-  
+
+  /* 
+   * Send all the network updates to the controller.
+   * Used when the controller goes down and comes back again
+   */
+  void sendAllNetworkUpdate();
+
   /*
    * Function to send Network Update to Controller
    */

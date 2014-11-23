@@ -475,6 +475,18 @@ void Switch::sendNetworkUpdate(UpdateType updateType, unsigned int nodeId) {
   }
 }
 
+/*
+ * When the controller comes up the switch should send all the updates to make
+ * sure the controller has the correct network map
+ */
+void Switch::sendAllNetworkUpdate() {
+  for (auto &entry : connectedSwitchList_) {
+    sendNetworkUpdate(UpdateType::ADD_SWITCH, entry);
+  }
+  for (auto &entry : connectedHostList_) {
+    sendNetworkUpdate(UpdateType::ADD_HOST, entry);
+  }
+}
 
 void Switch::handleRegistrationResp() {
   /* first one needs to be removed */
@@ -505,6 +517,9 @@ void Switch::handleRegistrationResp() {
             connectedSwitchList_.end(), myController_), connectedSwitchList_.end());
     connectedHostList_.erase(std::remove(connectedHostList_.begin(),
             connectedHostList_.end(), myController_), connectedHostList_.end());
+
+    /* if the controller has just been connected send all the network updates */
+    sendAllNetworkUpdate();
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                 "Registered with Controller: " + std::to_string(myController_)
                 + " at interface: " + pending->interface);
