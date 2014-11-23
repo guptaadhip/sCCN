@@ -109,7 +109,7 @@ void Switch::handleHostRegistration() {
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "host Registration request received from "
                   + std::string(pending->interface));
-    if (pending->interface.compare(controllerIf_) != 0) {
+    if (pending->interface.compare(controllerIf_) == 0) {
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "got registration request from controller interface");
       continue;
