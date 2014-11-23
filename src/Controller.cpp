@@ -76,7 +76,8 @@ Controller::Controller(unsigned int myId) {
   auto switchStateThread = std::thread(&Controller::switchStateHandler, this);
   auto helloThread = std::thread(&Controller::sendHello, this);
   auto networkUpdateThread = std::thread(&Controller::handleNetworkUpdate, this);
-  auto subscriptionHandlerThread = std::thread(&Controller::handleKeywordSubscription, this);
+  auto keywordRegThread = std::thread(&Controller::handleKeywordRegistration, this);
+  auto keywordSubsThread = std::thread(&Controller::handleKeywordSubscription, this);
   packetHandler_.processQueue(&packetTypeToQueue_);
   /* waiting for all the packet engine threads */
   for (auto& joinThreads : packetEngineThreads) joinThreads.join();

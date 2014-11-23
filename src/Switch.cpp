@@ -277,6 +277,9 @@ void Switch::handleControlResponse() {
       }
       continue;
     }
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "Received Control Response packet from:" 
+                + pending->interface);
     /* if no controller is attached just drop the control packets */
     if (!registered_) {
       continue;
@@ -314,7 +317,7 @@ void Switch::handleControlResponse() {
                 + interface->second);
       continue;
     }
-    entry->second.forward(pending->packet, RESPONSE_HEADER_LEN);
+    entry->second.send(pending->packet,RESPONSE_HEADER_LEN + PACKET_HEADER_LEN);
   }
 }
 
@@ -336,27 +339,23 @@ void Switch::handleControlRequest() {
       }
       continue;
     }
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "Received Control Request packet from:" 
+                + pending->interface);
     /* if no controller is attached just drop the control packets */
     if (!registered_) {
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+                  "Not registered with any controller dropping packet");
       continue;
     }
     struct RequestPacketHeader reqPacket;
     bcopy(pending->packet + PACKET_HEADER_LEN, &reqPacket, REQUEST_HEADER_LEN);
-    /* no duplicates should go in the vector */
-    if (std::find(nodeList_.begin(), nodeList_.end(), 
-                   reqPacket.hostId) == nodeList_.end()) {
-      nodeList_.push_back(reqPacket.hostId);
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                "New Node found: " + std::to_string(reqPacket.hostId));
-    } else {
-      /* TBD: Check if all handled */
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                  "Got hello from unknown host: " 
-                  + std::to_string(reqPacket.hostId));
-      continue;
-    }
     auto entry = ifToPacketEngine_.find(controllerIf_);
-    entry->second.forward(pending->packet, reqPacket.len 
+    if (entry == ifToPacketEngine_.end()) {
+      Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
+                  "Could not find the packetEngine for controller");
+    }
+    entry->second.send(pending->packet, reqPacket.len 
                           + REQUEST_HEADER_LEN + PACKET_HEADER_LEN);
   }
 }
