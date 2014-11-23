@@ -34,6 +34,11 @@ class Switch{
   void sendNetworkUpdate(UpdateType, unsigned int);
 
   /*
+   * Handle Registration Messages from the host
+   */
+  void handleHostRegistration();
+
+  /*
    * Handle Registration Response from Controller
    */
   void handleRegistrationResp();
@@ -111,6 +116,7 @@ class Switch{
    * Queues for the handler threads
    */
   Queue switchRegRespQueue_;
+  Queue hostRegistrationReqQueue_;
   Queue helloQueue_;
   Queue controlRequestQueue_;
   Queue controlResponseQueue_;

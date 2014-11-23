@@ -40,6 +40,9 @@ Switch::Switch(unsigned int myId) {
                         ((unsigned short) PacketType::SWITCH_REGISTRATION_ACK,
                           &switchRegRespQueue_));
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
+                        ((unsigned short) PacketType::HOST_REGISTRATION,
+                          &hostRegistrationReqQueue_));
+  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
                         ((unsigned short) PacketType::HELLO, &helloQueue_));
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
                         ((unsigned short) PacketType::DATA, &dataQueue_));
@@ -66,6 +69,7 @@ Switch::Switch(unsigned int myId) {
   auto controlPacketthread = std::thread(&Switch::handleControlRequest, this);
   auto dataPacketthread = std::thread(&Switch::handleData, this);
   auto rulethread = std::thread(&Switch::handleRuleUpdate, this);
+  auto hostRegthread = std::thread(&Switch::handleHostRegistration, this);
 
   auto nodeStatethread = std::thread(&Switch::nodeStateHandler, this);
 
@@ -81,6 +85,74 @@ Switch::Switch(unsigned int myId) {
   auto sendHello = std::thread(&Switch::sendHello, this);
   packetHandler_.processQueue(&packetTypeToQueue_);
 
+}
+
+/*
+ * Handle Host Registration Request
+ */
+void Switch::handleHostRegistration() {
+  /* first one needs to be removed */
+  (void) hostRegistrationReqQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+  while(true) {
+    auto pending = hostRegistrationReqQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) { 
+      std::unique_lock<std::mutex> lock (
+                                hostRegistrationReqQueue_.packet_ready_mutex_); 
+      if( !hostRegistrationReqQueue_.packet_in_queue_) {
+        hostRegistrationReqQueue_.packet_ready_.wait(lock);
+      }
+      continue;
+    }
+    /* handle host registration */
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                  "host Registration request received from "
+                  + std::string(pending->interface));
+    if (pending->interface.compare(controllerIf_) != 0) {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                  "got registration request from controller interface");
+      continue;
+    }
+    struct RegistrationPacketHeader regRequest;
+    bcopy(pending->packet + PACKET_HEADER_LEN, &regRequest, 
+                                                      REGISTRATION_HEADER_LEN);
+
+    /* no duplicates should go in the vector */
+    if (std::find(nodeList_.begin(), nodeList_.end(), 
+                   regRequest.nodeId) == nodeList_.end()) {
+      nodeList_.push_back(regRequest.nodeId);
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "New Host found: " + std::to_string(regRequest.nodeId));
+    }
+    /* store in the list of connected host list */
+    if (std::find(connectedHostList_.begin(), connectedHostList_.end(), 
+                   regRequest.nodeId) == connectedHostList_.end()) {
+      connectedHostList_.push_back(regRequest.nodeId);
+      nodeIdToIf_.insert(std::pair<unsigned int, std::string> 
+                          (regRequest.nodeId, pending->interface));
+      sendNetworkUpdate(UpdateType::ADD_HOST, regRequest.nodeId);
+    }
+    /*  
+     * Send ACK back to the switch
+     */
+    auto entry = ifToPacketEngine_.find(pending->interface);
+    if (entry == ifToPacketEngine_.end()) {
+      Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
+                  "cannot find packet engine for interface "
+                  + pending->interface);
+    }   
+    char packet[REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN];
+    PacketTypeHeader header;
+    header.packetType = PacketType::HOST_REGISTRATION_ACK;
+    RegistrationResponsePacketHeader respHeader;
+    respHeader.nodeId = myId_;
+    memcpy(packet, &header, PACKET_HEADER_LEN);
+    memcpy(packet + PACKET_HEADER_LEN, &respHeader, 
+                                    REGISTRATION_RESPONSE_HEADER_LEN);
+    int len = REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN;
+    entry->second.send(packet, len);
+  }
 }
 
 /*
@@ -255,13 +327,12 @@ void Switch::handleControlRequest() {
       nodeList_.push_back(reqPacket.hostId);
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "New Node found: " + std::to_string(reqPacket.hostId));
-    }
-    if (std::find(connectedHostList_.begin(), connectedHostList_.end(), 
-                   reqPacket.hostId) == connectedHostList_.end()) {
-      connectedHostList_.push_back(reqPacket.hostId);
-      /* TBD: send network update */
+    } else {
+      /* TBD: Check if all handled */
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                "New Host found: " + std::to_string(reqPacket.hostId));
+                  "Got hello from unknown host: " 
+                  + std::to_string(reqPacket.hostId));
+      continue;
     }
     auto entry = ifToPacketEngine_.find(controllerIf_);
     entry->second.forward(pending->packet, reqPacket.len 

@@ -40,6 +40,8 @@ enum class PacketType: unsigned short {
   RULE = 0xD2,
   RULE_ACK = 0xD3,
   RULE_NACK = 0xD4,
+  HOST_REGISTRATION = 0xD5,
+  HOST_REGISTRATION_ACK = 0xD6,
 };
 /*
  * Type of the update packet sent from Switch to the controller
