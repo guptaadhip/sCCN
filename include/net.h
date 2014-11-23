@@ -117,7 +117,7 @@ struct HelloPacketHeader {
 struct NetworkUpdatePacketHeader {
   UpdateType type;
   unsigned int nodeId;
-  std::string interface;
+  char interface[10];
 };
 
 

@@ -459,8 +459,9 @@ void Switch::sendNetworkUpdate(UpdateType updateType, unsigned int nodeId) {
   networkUpdatePacketHeader.type = updateType;
   networkUpdatePacketHeader.nodeId = nodeId;
   auto nodeIdToIfIterator = nodeIdToIf_.find(nodeId);
-  networkUpdatePacketHeader.interface = nodeIdToIfIterator->second;
-  
+  strncpy(networkUpdatePacketHeader.interface, 
+          nodeIdToIfIterator->second.c_str(), 
+          sizeof(networkUpdatePacketHeader.interface));
   memcpy(packet, &header, PACKET_HEADER_LEN);
   memcpy(packet + PACKET_HEADER_LEN, &networkUpdatePacketHeader, NETWORK_UPDATE_HEADER_LEN);
   
@@ -499,6 +500,11 @@ void Switch::handleRegistrationResp() {
                    regResponse.nodeId) == nodeList_.end()) {
       nodeList_.push_back(regResponse.nodeId);
     }
+    /* make sure this is not in the host or switch list */
+    connectedSwitchList_.erase(std::remove(connectedSwitchList_.begin(),
+            connectedSwitchList_.end(), myController_), connectedSwitchList_.end());
+    connectedHostList_.erase(std::remove(connectedHostList_.begin(),
+            connectedHostList_.end(), myController_), connectedHostList_.end());
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                 "Registered with Controller: " + std::to_string(myController_)
                 + " at interface: " + pending->interface);

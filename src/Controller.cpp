@@ -608,7 +608,7 @@ void Controller::handleNetworkUpdate() {
     bcopy(pending->packet + PACKET_HEADER_LEN, &networkUpdatePacket, NETWORK_UPDATE_HEADER_LEN);
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
       "Received network update handling packet from: " + pending->interface + 
-      "regarding" + std::to_string(networkUpdatePacket.nodeId));
+      " regarding " + std::to_string(networkUpdatePacket.nodeId));
     /* TBD : Write the code for network Update handling and
      changing the network map */
   }
