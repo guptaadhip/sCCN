@@ -15,6 +15,7 @@ struct PacketEntry {
   char packet[BUFLEN];
   std::string interface;
   struct PacketEntry *next;
+  unsigned int len;
 };
 
 /*
@@ -43,6 +44,8 @@ enum class PacketType: unsigned short {
   RULE_NACK = 0xD4,
   HOST_REGISTRATION = 0xD5,
   HOST_REGISTRATION_ACK = 0xD6,
+  NETWORK_UPDATE_ACK = 0xD7,
+  NETWORK_UPDATE_NACK = 0xD8
 };
 /*
  * Type of the update packet sent from Switch to the controller
@@ -116,9 +119,18 @@ struct HelloPacketHeader {
  * Structure of the Network Update packet from switch to Controller
  */
 struct NetworkUpdatePacketHeader {
+  unsigned int seqNo;
   UpdateType type;
   unsigned int nodeId;
   char interface[10];
+};
+
+/*
+ * Structure of the Network Update Response packet from Controller to Switch
+ */
+struct NetworkUpdateResponsePacketHeader {
+  unsigned int seqNo;
+  unsigned int nodeId;
 };
 
 
@@ -142,6 +154,8 @@ static const int NETWORK_UPDATE_HEADER_LEN = sizeof(NetworkUpdatePacketHeader);
 static const int REGISTRATION_HEADER_LEN = sizeof(RegistrationPacketHeader);
 static const int REGISTRATION_RESPONSE_HEADER_LEN = 
                                       sizeof(RegistrationResponsePacketHeader);
+static const int NETWORK_UPDATE_RESPONSE_HEADER_LEN = 
+                        sizeof(NetworkUpdateResponsePacketHeader);
 
 #endif 
 
