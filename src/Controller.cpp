@@ -22,6 +22,7 @@ using namespace std;
 Controller::Controller(unsigned int myId) {
   myId_ = myId;
   lastUniqueId_ = 0;
+  weight_ = 1;
   Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                                                      "Entering Controller");
   std::vector<std::thread> packetEngineThreads;
@@ -184,6 +185,7 @@ void Controller::handleSwitchRegistration() {
      * Add the switch and interface mapping
      */
     switchToIf_[regPacket.nodeId] = pending->interface;
+    ifToSwitch_[pending->interface] = regPacket.nodeId;
     /*
      * Send ACK back to the switch
      */
@@ -219,9 +221,11 @@ void Controller::handleSwitchRegistration() {
 */
 void Controller::handleKeywordRegistration()
 {
-  (void) registrationQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
+  (void) registrationQueue_.packet_in_queue_.exchange(0,
+    std::memory_order_consume);
   while(true) {
-    auto pending = registrationQueue_.packet_in_queue_.exchange(0, std::memory_order_consume);
+    auto pending = registrationQueue_.packet_in_queue_.exchange(0,
+     std::memory_order_consume);
     if( !pending ) { 
       std::unique_lock<std::mutex> lock(registrationQueue_.packet_ready_mutex_);    
       if( !registrationQueue_.packet_in_queue_) {
@@ -252,11 +256,15 @@ void Controller::handleKeywordRegistration()
 
     /* Prepare the packet engine */
     auto packetEngine = ifToPacketEngine_.find(pending->interface);
-    
+
     /*
      *  Handling Registration Request
      */
     if(packetTypeHeader.packetType == PacketType::REGISTRATION_REQ) {
+      /* TBD: If new publisher for existing keyword comes up and
+      *  subscriber count not zero
+      * then install rules for all subscribers
+      */
       if (requestPacketHeader.len == 0) {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "Received invalid request packet from "
@@ -272,10 +280,13 @@ void Controller::handleKeywordRegistration()
                                   RESPONSE_HEADER_LEN);
         continue;
       }
+
       int headerLen = PACKET_HEADER_LEN + REQUEST_HEADER_LEN;
       /* get the keywords */
+
       auto keywords = std::string(pending->packet + headerLen);
       std::vector<std::string> keywordList;
+
       auto found = keywordsToUniqueId_.find(keywords);
       /*
        * If the keyword does not exist, then insert it
@@ -284,7 +295,7 @@ void Controller::handleKeywordRegistration()
       if(found == keywordsToUniqueId_.end()) {
         uniqueId = uniqueIdGenerator(lastUniqueId_);
         lastUniqueId_ = uniqueId;
-        
+
         /* Updating map number 1 */
         keywordsToUniqueId_.insert(std::pair<std::string,unsigned int>
                                    (keywords, uniqueId));
@@ -305,15 +316,16 @@ void Controller::handleKeywordRegistration()
                                   std::set<unsigned int>> (item, uniqueIdSet));
           }
         }
-        /* Updating the map of keyword to publishers */
-        auto keywordToPubsIterator = keywordToPublishers_.find(keywords);
-        if(keywordToPubsIterator != keywordToPublishers_.end()) {
-          keywordToPublishers_[keywords].insert(requestPacketHeader.hostId);
+
+        /* Updating the map of UniqueID to publishers */
+        auto uniqueIdToPubsIterator = uniqueIdToPublishers_.find(uniqueId);
+        if(uniqueIdToPubsIterator != uniqueIdToPublishers_.end()) {
+          uniqueIdToPublishers_[uniqueId].insert(requestPacketHeader.hostId);
         } else {
           std::set<unsigned int> pubsHostIdSet;
           pubsHostIdSet.insert(pubsHostIdSet.end(), requestPacketHeader.hostId);
-          keywordToPublishers_.insert(std::pair<std::string,
-                            std::set<unsigned int>> (keywords, pubsHostIdSet));
+          uniqueIdToPublishers_.insert(std::pair<unsigned int,
+                            std::set<unsigned int>> (uniqueId, pubsHostIdSet));
         }
         /* copy the unique Id */
         bcopy(&uniqueId, responsePacket + PACKET_HEADER_LEN +
@@ -324,7 +336,7 @@ void Controller::handleKeywordRegistration()
               RESPONSE_HEADER_LEN, sizeof(unsigned int));
       }
       /* send ACK */
-      responsePacketHeader.len = 1;
+      responsePacketHeader.len = sizeof(unsigned int);
       replyPacketTypeHeader.packetType = PacketType::REGISTRATION_ACK;
       memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
       memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
@@ -341,7 +353,7 @@ void Controller::handleKeywordRegistration()
                     + " sending NACK");
         /* Send Nack */
         responsePacketHeader.len = 0;
-        replyPacketTypeHeader.packetType = PacketType::REGISTRATION_NACK;
+        replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_NACK;
         memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
         memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
                RESPONSE_HEADER_LEN);
@@ -351,73 +363,108 @@ void Controller::handleKeywordRegistration()
       }
       /* the deregistration request will only be one unique Id */
       unsigned int uniqueId;
+      int flag;
       bcopy(pending->packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, &uniqueId,
             sizeof(unsigned int));
-      
-      /* 
-       * searching for the unique id in Map #1.
-       *  This is O(n) algorithm. See if it can be optimized.
-       */
-      for(auto &entry : keywordsToUniqueId_){
-        if (entry.second == uniqueId) {
-          /* unique id found */
-          
-          /* erase from map number 1 */
-          keywordsToUniqueId_.erase(entry.first);
-          
-          std::vector<std::string> keywordList;
-          boost::split(keywordList, entry.first, boost::is_any_of(";"));
-          
-          /* erase the Map number 2 */
-          for (auto item : keywordList) {
-            /* 
-             * If the entry for this item exists in map number 2
-             */
+      auto publisherIterator = uniqueIdToPublishers_.find(uniqueId);
+      if(publisherIterator != uniqueIdToPublishers_.end()){
+       if(uniqueIdToPublishers_[uniqueId].size() == 0){
+        flag = 0;
+        /*
+        * searching for the unique id in Map #1.
+        * This is O(n) algorithm. See if it can be optimized.
+        */
+        for(auto &entry : keywordsToUniqueId_){
+           if (entry.second == uniqueId) {
+           /* unique id found */
+           std::vector<std::string> keywordList;
+           boost::split(keywordList, entry.first, boost::is_any_of(";"));
+
+           /* erase from map number 1 */
+           keywordsToUniqueId_.erase(entry.first);
+
+           /* erase the Map number 2 */
+           for (auto item : keywordList) {
+            /* If the entry for this item exists in map number 2 */
             auto keywordToUIdsIterator = keywordToUniqueIds_.find(item);
             if(keywordToUIdsIterator != keywordToUniqueIds_.end()) {
-              auto it = keywordToUIdsIterator->second.find(uniqueId);
-              keywordToUIdsIterator->second.erase(it,
-                                          keywordToUIdsIterator->second.end());
-              /* send ack */
-              responsePacketHeader.len = 1;
-              replyPacketTypeHeader.packetType = PacketType::REGISTRATION_ACK;
-              memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-              memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
-                     RESPONSE_HEADER_LEN);
-              packetEngine->second.send(responsePacket,
-                                      PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
-              continue;
+             auto it = keywordToUIdsIterator->second.find(uniqueId);
+             keywordToUIdsIterator->second.erase(it,
+              keywordToUIdsIterator->second.end());
+             flag = 1;
+             continue;
             } else {
-              /* send nack */
-              Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-                          "Controller Structures inconsistent sending NACK");
-              /* Send Nack */
-              responsePacketHeader.len = 0;
-              replyPacketTypeHeader.packetType = PacketType::REGISTRATION_NACK;
-              memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-              memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
-                     RESPONSE_HEADER_LEN);
-              packetEngine->second.send(responsePacket, PACKET_HEADER_LEN +
-                                        RESPONSE_HEADER_LEN);
-              
+             flag = 2;
+             break;
             }
+           }
           }
         }
+        responsePacketHeader.len = 0;
+        if (flag == 1) {
+         /* send ack */
+         replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_ACK;
+         memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+         memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+         RESPONSE_HEADER_LEN);
+         packetEngine->second.send(responsePacket,
+         PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
+         continue;
+        } else if (flag == 2) {
+         Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+         "Controller Structures inconsistent sending NACK");
+         /* Send Nack */
+         replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_NACK;
+         memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+         memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+         RESPONSE_HEADER_LEN);
+         packetEngine->second.send(responsePacket, PACKET_HEADER_LEN +
+         RESPONSE_HEADER_LEN);
+         continue;
+        }
+
+        /* Unique Id was not found */
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+         "Received invalid unique Id from "
+         + std::to_string(requestPacketHeader.hostId)
+         + " sending NACK");
+        /* Send Nack */
+        responsePacketHeader.len = 0;
+        replyPacketTypeHeader.packetType = PacketType::REGISTRATION_NACK;
+        memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+        memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+         RESPONSE_HEADER_LEN);
+        packetEngine->second.send(responsePacket, PACKET_HEADER_LEN +
+         RESPONSE_HEADER_LEN);
+        continue;
+       }else{
+        uniqueIdToPublishers_[uniqueId].erase(requestPacketHeader.hostId);
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                   "Host Un-register UniqueID " + std::to_string(uniqueId)
+                    + " sending NACK");
+        /* Send Ack */
+        responsePacketHeader.len = 1;
+        replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_ACK;
+        memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+        memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+               RESPONSE_HEADER_LEN);
+        packetEngine->second.send(responsePacket,
+          PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
+        continue;
+       }
+      }else{
+       Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+                   "Host tried to Un-register invalid Unique ID");
+       /* Send Nack */
+       responsePacketHeader.len = 0;
+       replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_NACK;
+       memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+       memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+              RESPONSE_HEADER_LEN);
+       packetEngine->second.send(responsePacket, PACKET_HEADER_LEN +
+                                 RESPONSE_HEADER_LEN);
+       continue;
       }
-      /* Unique Id was not found */
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-                  "Received invalid unique Id from "
-                  + std::to_string(requestPacketHeader.hostId)
-                  + " sending NACK");
-      /* Send Nack */
-      responsePacketHeader.len = 0;
-      replyPacketTypeHeader.packetType = PacketType::REGISTRATION_NACK;
-      memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-      memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
-             RESPONSE_HEADER_LEN);
-      packetEngine->second.send(responsePacket, PACKET_HEADER_LEN +
-                                RESPONSE_HEADER_LEN);
-      continue;
     } else {
       /* this should never happen */
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
@@ -449,7 +496,7 @@ void Controller::handleKeywordSubscription() {
   /* first one needs to be removed */
   (void) subscriptionQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-    auto pending = subscriptionQueue_.packet_in_queue_.exchange(0, 
+    auto pending = subscriptionQueue_.packet_in_queue_.exchange(0,
                                                     std::memory_order_consume);
     if( !pending ) { 
       std::unique_lock<std::mutex> lock(subscriptionQueue_.packet_ready_mutex_);    
@@ -489,7 +536,8 @@ void Controller::handleKeywordSubscription() {
     */
     if(packetTypeHeader.packetType == PacketType::SUBSCRIPTION_REQ) {
     	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-      "Received Subscription request from " + std::to_string(requestPacketHeader.hostId));
+      "Received Subscription request from " 
+       + std::to_string(requestPacketHeader.hostId));
 
       std::set<unsigned int> common;
       std::set<unsigned int> *bc = &common;
@@ -509,7 +557,8 @@ void Controller::handleKeywordSubscription() {
       		} else {
       		  // Remove elements from bc which are missing from ac.
       		  // The time required is proportional to log(ac.size()) * bc->size()
-      		  const std::set<unsigned int>::const_iterator a_end = keywordToUIdsIterator->second.end();
+          const std::set<unsigned int>::const_iterator a_end =
+            keywordToUIdsIterator->second.end();
       		  const std::set<unsigned int>::const_iterator b_end = bc->end();
       		  for (std::set<unsigned int>::iterator b = bc->begin(); b != b_end; ) {
       		    if (keywordToUIdsIterator->second.find(*b) == a_end) {  // Not found.
@@ -528,7 +577,7 @@ void Controller::handleKeywordSubscription() {
       		*/ 
       		responsePacketHeader.len = 0;
       		replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_NACK;
-      		memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+        memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
       		memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
       			RESPONSE_HEADER_LEN);
       		packetEngineIterator->second.send(responsePacket, 
@@ -545,10 +594,12 @@ void Controller::handleKeywordSubscription() {
       	responsePacketHeader.len = common.size();
       	replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_ACK;
       	memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-      	memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader, RESPONSE_HEADER_LEN);
+      	memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+         RESPONSE_HEADER_LEN);
       	int count = 0; 
       	for(auto entry : common) {
-      		bcopy(&entry, responsePacket + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN + (count * sizeof(unsigned int)), sizeof(unsigned int));
+      		bcopy(&entry, responsePacket + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
+          + (count * sizeof(unsigned int)), sizeof(unsigned int));
       		count++;
       	}
       	int length = PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
@@ -559,14 +610,17 @@ void Controller::handleKeywordSubscription() {
       	responsePacketHeader.len = 0;
       	replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_NACK;
       	memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-      	memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader, RESPONSE_HEADER_LEN);
-      	packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
+      	memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader, 
+         RESPONSE_HEADER_LEN);
+      	packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN + 
+         RESPONSE_HEADER_LEN);
       }
     } else {
 
     	/* DESUBSCRIPTION REQUEST */
     	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-      "Received Desubscription request from " + std::to_string(requestPacketHeader.hostId));
+      "Received Desubscription request from " + 
+        std::to_string(requestPacketHeader.hostId));
 
 	    auto entry = keywordToCount_.find(keywords);
 	    if (entry != keywordToCount_.end()) {
@@ -579,8 +633,10 @@ void Controller::handleKeywordSubscription() {
       	responsePacketHeader.len = 0;
       	replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_ACK;
       	memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-      	memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader, RESPONSE_HEADER_LEN);
-      	packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
+      	memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader, 
+         RESPONSE_HEADER_LEN);
+      	packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN 
+        + RESPONSE_HEADER_LEN);
 	    } else {
 	    	/* TBD : Discuss what to do */
 	    }
@@ -606,12 +662,80 @@ void Controller::handleNetworkUpdate() {
       continue;
     }
     struct NetworkUpdatePacketHeader networkUpdatePacket;
-    bcopy(pending->packet + PACKET_HEADER_LEN, &networkUpdatePacket, NETWORK_UPDATE_HEADER_LEN);
+    bcopy(pending->packet + PACKET_HEADER_LEN, &networkUpdatePacket, 
+     NETWORK_UPDATE_HEADER_LEN);
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
       "Received network update handling packet from: " + pending->interface + 
       " regarding " + std::to_string(networkUpdatePacket.nodeId));
     /* TBD : Write the code for network Update handling and
      changing the network map */
+    
+    /* Network Map:: Formation */
+    PacketTypeHeader header;
+    
+    if(networkUpdatePacket.type == UpdateType::ADD_SWITCH || 
+      networkUpdatePacket.type == UpdateType::ADD_HOST){ 
+     /* Add a Link*/
+     if(ifToSwitch_.count(pending->interface) > 0){
+       boost::add_edge(ifToSwitch_[pending->interface], 
+         networkUpdatePacket.nodeId, weight_, graph_);
+       header.packetType = PacketType::NETWORK_UPDATE_ACK;
+     }else{
+      Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
+           "Network Map:: Error - Cannot find edge"
+           + std::to_string(ifToSwitch_[pending->interface]) + " : " +
+            std::to_string(networkUpdatePacket.nodeId));
+      header.packetType = PacketType::NETWORK_UPDATE_NACK;
+     }
+     /* TBD :: Modify rules as per Add or Delete of Edges */
+    }else if(networkUpdatePacket.type == UpdateType::DELETE_SWITCH || 
+      networkUpdatePacket.type == UpdateType::DELETE_HOST){
+     /* Remove a Link*/
+     if(ifToSwitch_.count(pending->interface) > 0){
+      std::pair <edgeDescriptor_,bool> edgeChecker = 
+        boost::edge(ifToSwitch_[pending->interface], networkUpdatePacket.nodeId,
+        graph_);
+      if(edgeChecker.second){
+       boost::remove_edge(ifToSwitch_[pending->interface], 
+         networkUpdatePacket.nodeId, graph_);
+       header.packetType = PacketType::NETWORK_UPDATE_ACK;
+      }else{
+       Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
+           "Network Map:: Error - Cannot find edge"
+           + std::to_string(ifToSwitch_[pending->interface]) + "-" 
+           + std::to_string(networkUpdatePacket.nodeId));
+       header.packetType = PacketType::NETWORK_UPDATE_NACK;
+      }
+     }else{
+       Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
+           "Network Map:: Error - Cannot find edge"
+           + std::to_string(ifToSwitch_[pending->interface]) + "-" 
+           + std::to_string(networkUpdatePacket.nodeId));
+      header.packetType = PacketType::NETWORK_UPDATE_NACK;
+     }
+     /* TBD :: Modify rules as per Add or Delete of Edges */
+    }
+    
+    auto entry = ifToPacketEngine_.find(pending->interface);
+    if (entry == ifToPacketEngine_.end()) {
+      Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
+                  "cannot find packet engine for interface "
+                  + pending->interface);
+    }
+    
+    char packet[NETWORK_UPDATE_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN];
+
+    NetworkUpdateResponsePacketHeader respHeader;
+    respHeader.nodeId = networkUpdatePacket.nodeId;
+    respHeader.seqNo = networkUpdatePacket.seqNo;
+    
+    memcpy(packet, &header, PACKET_HEADER_LEN);
+    memcpy(packet + PACKET_HEADER_LEN, &respHeader, 
+                                    NETWORK_UPDATE_RESPONSE_HEADER_LEN);
+    int len = NETWORK_UPDATE_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN;
+    entry->second.send(packet, len);
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                "Received Network Update packet from " + pending->interface);
   }
 }
 
@@ -630,7 +754,7 @@ void Controller::startSniffing(std::string myInterface,
     bcopy(packet, &packetTypeHeader, PACKET_HEADER_LEN);
     bcopy(packet + PACKET_HEADER_LEN, &helloPacketHeader, HELLO_HEADER_LEN);
     if(packetTypeHeader.packetType == PacketType::HELLO) {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Received a Hello packet from" 
                   + std::to_string(helloPacketHeader.nodeId) + " from " 
                   + myInterface);

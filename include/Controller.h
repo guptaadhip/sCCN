@@ -7,52 +7,37 @@
 #include "PacketHandler.h"
 #include "PacketEngine.h"
 #include "MyInterfaces.h"
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/undirected_graph.hpp>
 
 class Controller {
  public:
   Controller(unsigned int id);
-  /*
-   * Get my id
-   */
+  /* Get my id */
   unsigned int getId() const;
 
-  /*
-   * Thread to Sniff for interface and packet engine 
-   */
+  /* Thread to Sniff for interface and packet engine */
   void startSniffing(std::string, PacketEngine *packetEngine);
 
-  /*
-   * Handle Hello Messages from Switch
-   */
+  /* Handle Hello Messages from Switch */
   void handleHello();
 
-  /*
-   * Send Hello Messages to Switch
-   */
+  /* Send Hello Messages to Switch */
   void sendHello();
-  /*
-   * Thead to manage Switch State based on the hello message received
-   */
+  
+  /* Thead to manage Switch State based on the hello message received */
   void switchStateHandler();
 
-  /*
-   * Handle Switch Registration
-   */
+  /* Handle Switch Registration */
   void handleSwitchRegistration();
 
-  /*
-   * TBD : Handle Keyword Registration
-   */
+  /* TBD : Handle Keyword Registration */
   void handleKeywordRegistration();
 
-  /*
-   * TBD : Handle Keyword Subscription
-   */
+  /* TBD : Handle Keyword Subscription */
   void handleKeywordSubscription();
 
-  /*
-   * TBD : Handle Keyword Registration
-   */
+  /* TBD : Handle Keyword Registration */
   void handleNetworkUpdate();
 
  private:
@@ -66,6 +51,7 @@ class Controller {
   /* all switch based data structures */
   std::vector<unsigned int> switchList_;
   std::unordered_map<unsigned int, std::string> switchToIf_;
+  std::unordered_map<std::string, unsigned int> ifToSwitch_;
   std::unordered_map<unsigned int, bool> switchToHello_;
   std::unordered_map <unsigned int, int> switchToHelloCount_;
 
@@ -82,9 +68,9 @@ class Controller {
   */
   std::unordered_map<std::string, unsigned int> keywordToCount_;
   /* 
-   * Data Structure to store the keyword to list of publishers
+   * Data Structure to store the uniqueId to list of publishers
   */
-  std::unordered_map<std::string, std::set<unsigned int> > keywordToPublishers_;
+  std::unordered_map<unsigned int, std::set<unsigned int> > uniqueIdToPublishers_;
   /* 
    * Data Structure to store the keyword to list of subscribers
   */
@@ -98,4 +84,26 @@ class Controller {
   Queue registrationQueue_;
   Queue subscriptionQueue_;
   Queue networkUpdateQueue_;
+  
+  /*
+   * Network Map
+   */
+  typedef boost::property<boost::edge_weight_t, float> weightProperty_;
+  typedef boost::adjacency_list<
+            boost::setS,      // out-edges stored in a std::list
+            boost::vecS,      // vertex set stored here
+            boost::undirectedS,      // undirected graph.
+            boost::no_property,      // vertex properties
+            weightProperty_,      // edge properties
+            boost::no_property,      // graph properties
+            boost::listS      // edge storage
+      > graphStructure_;
+
+  weightProperty_ weight_;
+  typedef boost::graph_traits <graphStructure_>::vertex_descriptor
+   vertexDescriptor_;
+  typedef boost::graph_traits <graphStructure_>::edge_descriptor edgeDescriptor_;
+  typedef std::pair<int, int> edge_;
+
+  graphStructure_ graph_;
 };

@@ -74,7 +74,21 @@ void ControllerInterface::readSocket() {
         bzero(data, sizeof(data));
         sprintf(data, "%d", controller_->getId()); 
         sendData(data, strlen(data));
-      } else {
+      }else if (strncmp(command, "p", 1) == 0) {
+        bzero(data, BUFLEN);
+        unsigned int len = 0;
+        bcopy(command + sizeof(char), &len, sizeof(unsigned int));
+        bcopy(command + sizeof(char) + sizeof(unsigned int), data, len * sizeof(char));
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                    "received publishing request for: " + std::string(data));
+      } else if (strncmp(command, "s", 1) == 0) {
+        bzero(data, BUFLEN);
+        unsigned int len = 0;
+        bcopy(command + sizeof(char), &len, sizeof(unsigned int));
+        bcopy(command + sizeof(char) + sizeof(unsigned int), data, len);
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                    "received subscription request for: " + std::string(data));
+      }else {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "Invalid Command: " + std::string(command));
       } 
