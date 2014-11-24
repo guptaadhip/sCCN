@@ -317,7 +317,8 @@ void Switch::handleControlResponse() {
                 + interface->second);
       continue;
     }
-    entry->second.send(pending->packet,RESPONSE_HEADER_LEN + PACKET_HEADER_LEN);
+    entry->second.send(pending->packet, RESPONSE_HEADER_LEN 
+                        + PACKET_HEADER_LEN + respPacket.len);
   }
 }
 
