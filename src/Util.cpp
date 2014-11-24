@@ -23,6 +23,8 @@ unsigned int uniqueIdGenerator(unsigned int lastUniqueId) {
   if (lastUniqueId == 0) {
     return 100;
   } else {
-    return lastUniqueId++;
+    unsigned int uniqueId = lastUniqueId;
+    uniqueId = uniqueId + 1;
+    return uniqueId;
   }
 }
