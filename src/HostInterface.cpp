@@ -50,6 +50,7 @@ void HostInterface::readSocket() {
     return;
   }
   while (true) {
+    PacketEntry pkt;
     char data[BUFLEN];
     bool done = false;
     int rc;
@@ -73,19 +74,22 @@ void HostInterface::readSocket() {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "quiting");
       } else if (strncmp(command, "p", 1) == 0) {
-        bzero(data, BUFLEN);
+        bzero(pkt.packet, BUFLEN);
         unsigned int len = 0;
         bcopy(command + sizeof(char), &len, sizeof(unsigned int));
-        bcopy(command + sizeof(char) + sizeof(unsigned int), data, len * sizeof(char));
+        bcopy(command + sizeof(char) + sizeof(unsigned int), pkt.packet, 
+                                                        len * sizeof(char));
+        pkt.len = len;
+        host_->queueKeywordRegistration(&pkt);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-                    "received publishing request for: " + std::string(data));
+                    "received publishing request for: " + std::string(pkt.packet));
       } else if (strncmp(command, "s", 1) == 0) {
         bzero(data, BUFLEN);
         unsigned int len = 0;
         bcopy(command + sizeof(char), &len, sizeof(unsigned int));
         bcopy(command + sizeof(char) + sizeof(unsigned int), data, len);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-                    "received subscription request for: " + std::string(data));
+                    "received subscription request for: " + std::string(pkt.packet));
       } else {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "Invalid Command: " + std::string(command));

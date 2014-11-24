@@ -166,9 +166,9 @@ void PacketEngine::receive(char *packetOld) {
     if (rc < 0 || saddrll.sll_pkttype == PACKET_OUTGOING) {
       continue;
     }
-    PacketEntry packetEntry;
-    bcopy(packet, packetEntry.packet, BUFLEN); 
-    packetEntry.interface = interface_;
-    packetHandler_->queuePacket(&packetEntry);
+    PacketEntry *packetEntry = new PacketEntry;
+    bcopy(packet, packetEntry->packet, BUFLEN); 
+    packetEntry->interface = interface_;
+    packetHandler_->queuePacket(packetEntry);
   }
 }
