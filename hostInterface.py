@@ -36,13 +36,7 @@ def publish():
   if not keywords:
     print "No keywords founds"
     return
-  data = []
-  data.append("p")
-  data.append(listLen)
-  data.append(keywords)
-  print keywords, listLen
-  s = struct.Struct('cIs')
-  payload = s.pack(*data)
+  payload = "p" + struct.pack("I", listLen) + keywords
   return payload
 
 def subscribe():
@@ -50,20 +44,13 @@ def subscribe():
   if not keywords:
     print "No keywords founds"
     return
-  data = []
-  data.append("s")
-  data.append(listLen)
-  data.append(keywords)
-  print keywords, listLen
-  s = struct.Struct('cIs')
-  payload = s.pack(*data)
+  payload = "s" + struct.pack("I", listLen) + keywords
   return payload
 
 print "Connecting..."
-#if os.path.exists( "/tmp/hostSocket" ):
-if True:
-  #client = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
-  #client.connect( "/tmp/hostSocket" )
+if os.path.exists( "/tmp/hostSocket" ):
+  client = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
+  client.connect( "/tmp/hostSocket" )
   print "Ready."
   printHelp()
   while True:
@@ -76,15 +63,15 @@ if True:
           continue
         if "publish" == x:
           data = publish()
-          #client.send(data)
+          client.send(data)
           continue
         if "subscribe" == x:
           data = subscribe()
-          #client.send(data)
+          client.send(data)
           continue
         if "send data" == x:
           data = sendData()
-          #client.send(data)
+          client.send(data)
           continue
         client.send( x ) 
         if "quit" == x:
