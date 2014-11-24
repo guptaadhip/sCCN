@@ -3,12 +3,16 @@ import socket
 import struct
 import os, os.path
 
+publishUidList = []
+
 def printHelp():
   print "Commands:"
   print "\tquit"
   print "\thelp"
   print "\tsubscribe"
+  print "\tunsubscribe"
   print "\tpublish"
+  print "\tunpublish"
   print "\tshow publish keyword list"
   print "\tshow subscribe keyword list"
   print "\tsend data"
@@ -22,6 +26,7 @@ def getKeywords():
       x = raw_input( str(count) + " " )
       x = x.strip()
       if "q" == x:
+        keywords.sort()
         strKeywords = ';'.join(keywords)
         strKeywords += ';'
         return strKeywords, len(strKeywords)
@@ -31,13 +36,46 @@ def getKeywords():
     except KeyboardInterrupt, k:
       return 
 
-def publish():
+def publishingList(client):
+  global publishUidList
+  publishUidList = []
+  client.send("show publish keyword list")
+  data = client.recv(1024)
+  if data == "0":
+    print "Not publishing any keywords"
+    return
+  print "List is:"
+  tmp = 0
+  count = int(data)
+  while tmp < count:
+    data = client.recv(1024)
+    idx = data.rfind(';')
+    publishUidList.append(str(data[idx + 1:]))
+    print data[:idx] + "\t" + data[idx + 1:]
+    tmp = tmp + 1
+
+def unpublish(client):
+  global publishUidList
+  publishingList(client)
+  print publishUidList
+  x = raw_input( "\nEnter Unique Id: " )
+  x = x.strip()
+  if "" != x:
+    if x not in publishUidList:
+      print "Invalid Unique Id"
+    else:
+      payload = "u" + struct.pack("I", int(x))
+      client.send(payload)
+  else:
+    print "Invalid Unique Id"
+
+def publish(client):
   keywords, listLen = getKeywords()
   if not keywords:
     print "No keywords founds"
     return
   payload = "p" + struct.pack("I", listLen) + keywords
-  return payload
+  client.send(payload)
 
 def subscribe():
   keywords, listLen = getKeywords()
@@ -61,26 +99,32 @@ if os.path.exists( "/tmp/hostSocket" ):
         if "help" == x:
           printHelp()
           continue
-        if "publish" == x:
-          data = publish()
-          client.send(data)
+        elif "publish" == x:
+          publish(client)
           continue
-        if "subscribe" == x:
+        elif "unpublish" == x:
+          unpublish(client)
+          continue
+        elif "show publish keyword list" == x:
+          publishingList(client)
+          continue
+        elif "subscribe" == x:
           data = subscribe()
           client.send(data)
           continue
-        if "send data" == x:
+        elif "send data" == x:
           data = sendData()
           client.send(data)
           continue
-        client.send( x ) 
-        if "quit" == x:
+        elif "quit" == x:
           print "Shutting down."
+          client.send(x)
           break
-        data = client.recv(2048);
-        if x == "show publish keyword list":
-          print "Publishing data for: \n" + data
-        elif x == "show subscribe keyword list":
+        else:
+          print "Invalid Command"
+          continue
+        data = client.recv(1024);
+        if x == "show subscribe keyword list":
           print "Subscribed for data: \n" + data
         else:
           print "Invalid command";

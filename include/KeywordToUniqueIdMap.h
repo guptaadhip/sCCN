@@ -23,6 +23,8 @@ class KeywordToUniqueIdMap {
 	/* displayMap - Print all the data from the map */
 	void displayMap();
 
+  std::unordered_map<std::string, unsigned int> getList();
+
 	private:
 	std::unordered_map<std::string, unsigned int> keywordID_;
 };

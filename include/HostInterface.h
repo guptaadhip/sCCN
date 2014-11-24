@@ -22,6 +22,11 @@ class HostInterface {
    */
   void sendData(char *data, int len);
 
+  /*
+   * sent the publish list from host
+   */
+  void sendPublishList();
+
  private:
   /* Host object */
   Host *host_;

@@ -63,6 +63,10 @@ string KeywordToUniqueIdMap::fetchKeyword(unsigned int uniqueID){
 	return "";
 }
 
+std::unordered_map<std::string, unsigned int> KeywordToUniqueIdMap::getList() {
+  return keywordID_;
+}
+
 /*
 * displayMap - Print all the data from the map
 */
