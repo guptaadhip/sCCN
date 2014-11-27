@@ -105,7 +105,7 @@ struct RegistrationResponsePacketHeader {
 struct RuleUpdatePacketHeader {
   UpdateType type;
   unsigned int uniqueId;
-  unsigned short port;
+  unsigned int nodeId;
 };
 
 /*
