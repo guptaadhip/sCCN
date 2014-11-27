@@ -219,8 +219,7 @@ void Controller::handleSwitchRegistration() {
 /*
 *  TBD : Handle Keyword Registration -> INCOMPLETE
 */
-void Controller::handleKeywordRegistration()
-{
+void Controller::handleKeywordRegistration(){
   (void) registrationQueue_.packet_in_queue_.exchange(0,
     std::memory_order_consume);
   while(true) {
@@ -257,9 +256,7 @@ void Controller::handleKeywordRegistration()
     /* Prepare the packet engine */
     auto packetEngine = ifToPacketEngine_.find(pending->interface);
 
-    /*
-     *  Handling Registration Request
-     */
+    /* Handling Registration Request */
     if(packetTypeHeader.packetType == PacketType::REGISTRATION_REQ) {
       /* TBD: If new publisher for existing keyword comes up and
       *  subscriber count not zero
@@ -316,25 +313,26 @@ void Controller::handleKeywordRegistration()
                                   std::set<unsigned int>> (item, uniqueIdSet));
           }
         }
-
-        /* Updating the map of UniqueID to publishers */
-        auto uniqueIdToPubsIterator = uniqueIdToPublishers_.find(uniqueId);
-        if(uniqueIdToPubsIterator != uniqueIdToPublishers_.end()) {
-          uniqueIdToPublishers_[uniqueId].insert(requestPacketHeader.hostId);
-        } else {
-          std::set<unsigned int> pubsHostIdSet;
-          pubsHostIdSet.insert(pubsHostIdSet.end(), requestPacketHeader.hostId);
-          uniqueIdToPublishers_.insert(std::pair<unsigned int,
-                            std::set<unsigned int>> (uniqueId, pubsHostIdSet));
-        }
         /* copy the unique Id */
         bcopy(&uniqueId, responsePacket + PACKET_HEADER_LEN +
               RESPONSE_HEADER_LEN, sizeof(unsigned int));
       } else {
+        uniqueId = &found->second;
         /* reply with the existing unique id */
         bcopy(&found->second, responsePacket + PACKET_HEADER_LEN +
               RESPONSE_HEADER_LEN, sizeof(unsigned int));
       }
+      /* Updating the map of UniqueID to publishers */
+      auto uniqueIdToPubsIterator = uniqueIdToPublishers_.find(uniqueId);
+      if(uniqueIdToPubsIterator != uniqueIdToPublishers_.end()) {
+        uniqueIdToPublishers_[uniqueId].insert(requestPacketHeader.hostId);
+      } else {
+        std::set<unsigned int> pubsHostIdSet;
+        pubsHostIdSet.insert(pubsHostIdSet.end(), requestPacketHeader.hostId);
+        uniqueIdToPublishers_.insert(std::pair<unsigned int,
+                          std::set<unsigned int>> (uniqueId, pubsHostIdSet));
+      }
+      
       /* send ACK */
       responsePacketHeader.len = sizeof(unsigned int);
       replyPacketTypeHeader.packetType = PacketType::REGISTRATION_ACK;
@@ -346,7 +344,7 @@ void Controller::handleKeywordRegistration()
       continue;
       
     } else if (packetTypeHeader.packetType == PacketType::DEREGISTRATION_REQ) {
-      if (requestPacketHeader.len == 0 || requestPacketHeader.len > 1) {
+      if (requestPacketHeader.len == 0) {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "Received invalid request packet from "
                     + std::to_string(requestPacketHeader.hostId)
@@ -361,14 +359,14 @@ void Controller::handleKeywordRegistration()
                                   RESPONSE_HEADER_LEN);
         continue;
       }
-      /* the deregistration request will only be one unique Id */
+      /* De-Registration request will only be one unique Id */
       unsigned int uniqueId;
       int flag;
       bcopy(pending->packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, &uniqueId,
             sizeof(unsigned int));
       auto publisherIterator = uniqueIdToPublishers_.find(uniqueId);
       if(publisherIterator != uniqueIdToPublishers_.end()){
-       if(uniqueIdToPublishers_[uniqueId].size() == 0){
+       if((uniqueIdToPublishers_[uniqueId].size()-1) == 0){
         flag = 0;
         /*
         * searching for the unique id in Map #1.
@@ -403,6 +401,8 @@ void Controller::handleKeywordRegistration()
         responsePacketHeader.len = 0;
         if (flag == 1) {
          /* send ack */
+         /* Delete entry for uniqueId from uniqueIdToPublishers_ */
+         uniqueIdToPublishers_.erase(uniqueId);
          replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_ACK;
          memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
          memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
@@ -414,6 +414,7 @@ void Controller::handleKeywordRegistration()
          Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
          "Controller Structures inconsistent sending NACK");
          /* Send Nack */
+         responsePacketHeader.len = 0;
          replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_NACK;
          memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
          memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
@@ -438,11 +439,12 @@ void Controller::handleKeywordRegistration()
          RESPONSE_HEADER_LEN);
         continue;
        }else{
-        uniqueIdToPublishers_[uniqueId].erase(requestPacketHeader.hostId);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                    "Host Un-register UniqueID " + std::to_string(uniqueId)
                     + " sending NACK");
         /* Send Ack */
+        /* TBD:: Check why len is 1 */
+        uniqueIdToPublishers_[uniqueId].erase(requestPacketHeader.hostId);
         responsePacketHeader.len = 1;
         replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_ACK;
         memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
@@ -491,7 +493,7 @@ void Controller::handleKeywordRegistration()
 void Controller::handleKeywordSubscription() {
 	char payload[BUFLEN]; /* get payload into this */
 	char responsePacket[BUFLEN]; 
-	bool flag = false, isFirst = false;
+	bool isFirst = false;
 
   /* first one needs to be removed */
   (void) subscriptionQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
@@ -515,12 +517,16 @@ void Controller::handleKeywordSubscription() {
       &requestPacketHeader, REQUEST_HEADER_LEN);
     bcopy(pending->packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, 
       payload, requestPacketHeader.len);
-    /* 
-     * TBD : May be sstream should not be used. Look into Regex
-    */
+
     auto keywords = std::string(payload);
     std::vector<std::string> keywordList;
-
+    int flag; 
+    /* 
+     Flag = 0, Send Nack - Should not happen ever
+     Flag = 1, Send Ack - Everything ok
+     Flag = 2, Send Nack - Something wrong with structures 
+    */
+    
     /* Preparing response packet */
     bzero(responsePacket, BUFLEN); /* zeroing the response packet */
     struct PacketTypeHeader replyPacketTypeHeader;
@@ -530,118 +536,170 @@ void Controller::handleKeywordSubscription() {
 
   	/* Prepare the packet engine */
   	auto packetEngineIterator = ifToPacketEngine_.find(pending->interface);
+   if(packetTypeHeader.packetType == PacketType::SUBSCRIPTION_REQ || 
+     packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_REQ) {
+    flag = 0;
 
-    /* 
-    *  If it is a Subscription Request
-    */
+    /* Common Pub * UnPub - Finding Intersection of keywords  -- Start */
+    boost::split(keywordList, keywords, boost::is_any_of(";"));
+    isFirst = false;
+    std::set<unsigned int> common;
+    std::set<unsigned int> *outer = &common;
+
+    for(auto keyword : keywordList) {
+     auto keywordToUIdsIterator = keywordToUniqueIds_.find(keyword);
+     if(keywordToUIdsIterator != keywordToUniqueIds_.end()) {
+      flag = 1;
+      /* Intersecting all Unique ID's for the Keyword List */
+       if(isFirst == false) {
+        isFirst = true;
+        common = keywordToUIdsIterator->second;
+       } else {
+         const std::set<unsigned int>::const_iterator inner_end =
+          keywordToUIdsIterator->second.end();
+         const std::set<unsigned int>::const_iterator outer_end = outer->end();
+         for (auto iter = outer->begin(); iter != outer_end; ) {
+          if (keywordToUIdsIterator->second.find(*iter) == inner_end) { 
+           // Not found.
+           const std::set<unsigned int>::iterator iter_old = iter++;
+           outer->erase(iter_old);
+          } else {
+           ++iter;
+          }
+         }
+       }
+     }else{
+      flag = 2;
+      break;
+     }
+    }
+    /* No intersection of UniqueId found, Send Nack */
+    if(common.empty()){
+     flag = 2;
+    }
+    /* Common Pub * UnPub - Finding Intersection of keywords  -- End */
     if(packetTypeHeader.packetType == PacketType::SUBSCRIPTION_REQ) {
-    	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+     /* SUBSCRIPTION_REQ */
+     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
       "Received Subscription request from " 
        + std::to_string(requestPacketHeader.hostId));
-
-      std::set<unsigned int> common;
-      std::set<unsigned int> *bc = &common;
-
-      boost::split(keywordList, keywords, boost::is_any_of(";"));
-      /* Parse the payload */
-      for(auto item : keywordList) {
-      	/* Lookup for this item in Map numbe 2 */
-      	auto keywordToUIdsIterator = keywordToUniqueIds_.find(item);
-
-      	/* if the item is present in Map 2 */
-      	if(keywordToUIdsIterator != keywordToUniqueIds_.end()) {
-      	  /* Take intersection of all the sets for this payload */
-      		if(isFirst == false) {
-      			isFirst = true;
-      			common = keywordToUIdsIterator->second;
-      		} else {
-      		  // Remove elements from bc which are missing from ac.
-      		  // The time required is proportional to log(ac.size()) * bc->size()
-          const std::set<unsigned int>::const_iterator a_end =
-            keywordToUIdsIterator->second.end();
-      		  const std::set<unsigned int>::const_iterator b_end = bc->end();
-      		  for (std::set<unsigned int>::iterator b = bc->begin(); b != b_end; ) {
-      		    if (keywordToUIdsIterator->second.find(*b) == a_end) {  // Not found.
-      		    	const std::set<unsigned int>::iterator b_old = b++;
-      		    	bc->erase(b_old);  // erase doesn't invalidate b.
-					    } else {
-					    	++b;
-					    }
-					  }
-      		}
-
-      	} else {
-      		/* 
-      		* sending a NACK. One of the items not found in
-      		* map number 2.
-      		*/ 
-      		responsePacketHeader.len = 0;
-      		replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_NACK;
-        memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-      		memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
-      			RESPONSE_HEADER_LEN);
-      		packetEngineIterator->second.send(responsePacket, 
-      			PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
-      		flag = true;
-      		break;
-      	}
-      } /* parsing the payload done */
-
-      if(flag == false) {
-      	/* This subscriber has been added to the subscriber count */
-      	keywordToCount_[keywords]++;
-      	/* Send the common unique Ids back to the host thru an ACK */
-      	responsePacketHeader.len = common.size();
-      	replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_ACK;
-      	memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-      	memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
-         RESPONSE_HEADER_LEN);
-      	int count = 0; 
-      	for(auto entry : common) {
-      		bcopy(&entry, responsePacket + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
+     if(flag == 1){ /* Send Ack  and Install Rules */
+      unsigned int count = 0; 
+      responsePacketHeader.len = common.size();
+      replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_ACK;
+      memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+      memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+        RESPONSE_HEADER_LEN);
+      /* TBD:: Find shortest path between all Pub to this Sub */
+      /* For each UID in common send rule installation on the above
+        found shortest path to each switch */
+      for(auto uniqueID : common) {
+        /* Updating the map of UniqueID to Subscriber */
+        auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueID);
+        if(uniqueIdToSubsIterator != uniqueIdToSubscribers_.end()) {
+         /* If  uniqueID already exists, insert subscriber into the set */
+         uniqueIdToSubscribers_[uniqueID].insert(requestPacketHeader.hostId);
+        } else {
+         /* If  uniqueID does not exists, insert uniqueID & subscriber into map */
+         std::set<unsigned int> subsHostIdSet;
+         subsHostIdSet.insert(subsHostIdSet.end(), requestPacketHeader.hostId);
+         uniqueIdToSubscribers_.insert(std::pair<unsigned int,
+         std::set<unsigned int>> (uniqueID, subsHostIdSet));
+        }
+       bcopy(&uniqueID, responsePacket + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
           + (count * sizeof(unsigned int)), sizeof(unsigned int));
-      		count++;
-      	}
-      	int length = PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
-      	+ (count * sizeof(unsigned int)); 
-      	packetEngineIterator->second.send(responsePacket, length);
-      } else {
-      	/* Sending a NACK */
-      	responsePacketHeader.len = 0;
-      	replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_NACK;
-      	memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-      	memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader, 
-         RESPONSE_HEADER_LEN);
-      	packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN + 
-         RESPONSE_HEADER_LEN);
+       count++;
       }
-    } else {
-
-    	/* DESUBSCRIPTION REQUEST */
-    	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-      "Received Desubscription request from " + 
+      packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN +
+       RESPONSE_HEADER_LEN + (count * sizeof(unsigned int));
+      continue;
+     }else if(flag == 2){ /* Send Nack */
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+          "Controller Structures inconsistent sending NACK");
+      responsePacketHeader.len = 0;
+      replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_NACK;
+      memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+      memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+       RESPONSE_HEADER_LEN);
+      packetEngineIterator->second.send(responsePacket,
+       PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
+       continue;
+     }
+     
+     /* Should not come here ever */
+     Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+      "Received No Keyword from " + std::to_string(requestPacketHeader.hostId)
+      + " sending NACK");
+      responsePacketHeader.len = 0;
+      replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_NACK;
+      memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+      memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+       RESPONSE_HEADER_LEN);
+      packetEngineIterator->second.send(responsePacket,
+       PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
+      continue;
+    }else if(packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_REQ) {
+     /* DESUBSCRIPTION REQUEST */
+     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+      "Received De-Subscription request from " + 
         std::to_string(requestPacketHeader.hostId));
 
-	    auto entry = keywordToCount_.find(keywords);
-	    if (entry != keywordToCount_.end()) {
-	    	keywordToCount_[keywords]--;
-	    	if(keywordToCount_[keywords] == 0) {
-	    		keywordToCount_.erase(keywords);
-	    	}
-
-	    	/* Sending an ACK */
-      	responsePacketHeader.len = 0;
-      	replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_ACK;
-      	memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
-      	memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader, 
-         RESPONSE_HEADER_LEN);
-      	packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN 
-        + RESPONSE_HEADER_LEN);
-	    } else {
-	    	/* TBD : Discuss what to do */
-	    }
+      if(flag == 1){ /* Send Ack and Remove Rules */
+       /* TBD:: Send packet to remove rules to the switch. */
+       unsigned int count = 0; 
+       responsePacketHeader.len = 0;
+       replyPacketTypeHeader.packetType = PacketType::DESUBSCRIPTION_ACK;
+       memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+       memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+        RESPONSE_HEADER_LEN);
+      /* TBD:: Find shortest path between all Pub to this Sub */
+      /* TBD:: For each UID in common send rule remove on the above
+        found shortest path to each switch */
+      for(auto uniqueID : common) {
+       /* Updating the map of UniqueID to Subscriber */
+       auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueID);
+       if(uniqueIdToSubsIterator != uniqueIdToSubscribers_.end()) {
+        if((uniqueIdToSubsIterator.second.size()-1) == 0){
+         /* No Subscriber for that uniqueID, remove the uniqueID */
+         uniqueIdToSubscribers_.erase(uniqueID);
+        }else{
+         /* Multiple Subscribers exists for that uniqueID, remove only 
+          that Subscriber */
+         uniqueIdToSubsIterator.second.erase(requestPacketHeader.hostId);
+        }
+       }
+      }
+      packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN +
+       RESPONSE_HEADER_LEN);
+      continue;
+     }else if(flag == 2){ /* Send Nack */
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+          "Controller Structures inconsistent sending NACK");
+      responsePacketHeader.len = 0;
+      replyPacketTypeHeader.packetType = PacketType::DESUBSCRIPTION_NACK;
+      memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+      memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+       RESPONSE_HEADER_LEN);
+      packetEngineIterator->second.send(responsePacket,
+       PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
+       continue;
+     }
+     
+     /* Should not come here ever */
+     Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+      "Received No Keyword from " + std::to_string(requestPacketHeader.hostId)
+      + " sending NACK");
+      responsePacketHeader.len = 0;
+      replyPacketTypeHeader.packetType = PacketType::DESUBSCRIPTION_NACK;
+      memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
+      memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
+       RESPONSE_HEADER_LEN);
+      packetEngineIterator->second.send(responsePacket,
+       PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
+      continue;
     }
-  }  
+   }
+  }
 }
 
 
