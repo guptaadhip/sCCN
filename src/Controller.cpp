@@ -317,7 +317,7 @@ void Controller::handleKeywordRegistration(){
         bcopy(&uniqueId, responsePacket + PACKET_HEADER_LEN +
               RESPONSE_HEADER_LEN, sizeof(unsigned int));
       } else {
-        uniqueId = &found->second;
+        uniqueId = found->second;
         /* reply with the existing unique id */
         bcopy(&found->second, responsePacket + PACKET_HEADER_LEN +
               RESPONSE_HEADER_LEN, sizeof(unsigned int));
@@ -594,7 +594,7 @@ void Controller::handleKeywordSubscription() {
       /* For each UID in common send rule installation on the above
         found shortest path to each switch */
       for(auto uniqueID : common) {
-        /* Updating the map of UniqueID to Subscriber */
+       /* Updating the map of UniqueID to Subscriber */
         auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueID);
         if(uniqueIdToSubsIterator != uniqueIdToSubscribers_.end()) {
          /* If  uniqueID already exists, insert subscriber into the set */
@@ -606,12 +606,12 @@ void Controller::handleKeywordSubscription() {
          uniqueIdToSubscribers_.insert(std::pair<unsigned int,
          std::set<unsigned int>> (uniqueID, subsHostIdSet));
         }
-       bcopy(&uniqueID, responsePacket + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
-          + (count * sizeof(unsigned int)), sizeof(unsigned int));
-       count++;
+        bcopy(&uniqueID, responsePacket + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
+           + (count * sizeof(unsigned int)), sizeof(unsigned int));
+        count++;
       }
       packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN +
-       RESPONSE_HEADER_LEN + (count * sizeof(unsigned int));
+       RESPONSE_HEADER_LEN + (count * sizeof(unsigned int)));
       continue;
      }else if(flag == 2){ /* Send Nack */
       Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
@@ -659,13 +659,13 @@ void Controller::handleKeywordSubscription() {
        /* Updating the map of UniqueID to Subscriber */
        auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueID);
        if(uniqueIdToSubsIterator != uniqueIdToSubscribers_.end()) {
-        if((uniqueIdToSubsIterator.second.size()-1) == 0){
+        if((uniqueIdToSubsIterator->second.size()-1) == 0){
          /* No Subscriber for that uniqueID, remove the uniqueID */
          uniqueIdToSubscribers_.erase(uniqueID);
         }else{
          /* Multiple Subscribers exists for that uniqueID, remove only 
           that Subscriber */
-         uniqueIdToSubsIterator.second.erase(requestPacketHeader.hostId);
+         uniqueIdToSubsIterator->second.erase(requestPacketHeader.hostId);
         }
        }
       }
