@@ -11,6 +11,7 @@
 #include <cstring>
 #include <string>
 #include <boost/algorithm/string.hpp>
+#include <boost/graph/dijkstra_shortest_paths.hpp>
 
 using namespace std;
 
@@ -402,6 +403,7 @@ void Controller::handleKeywordRegistration(){
         if (flag == 1) {
          /* send ack */
          /* Delete entry for uniqueId from uniqueIdToPublishers_ */
+         /* TBD:: Remove rules from switches for that UniqueId from the switches*/
          uniqueIdToPublishers_.erase(uniqueId);
          replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_ACK;
          memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
@@ -590,9 +592,6 @@ void Controller::handleKeywordSubscription() {
       memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
       memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
         RESPONSE_HEADER_LEN);
-      /* TBD:: Find shortest path between all Pub to this Sub */
-      /* For each UID in common send rule installation on the above
-        found shortest path to each switch */
       for(auto uniqueID : common) {
        /* Updating the map of UniqueID to Subscriber */
         auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueID);
@@ -606,6 +605,10 @@ void Controller::handleKeywordSubscription() {
          uniqueIdToSubscribers_.insert(std::pair<unsigned int,
          std::set<unsigned int>> (uniqueID, subsHostIdSet));
         }
+        /* Find shortest path between all Pub to this Sub for each uniqueId
+           And Install corresponding ADD rules on the switches */ 
+        installRules(responsePacketHeader.hostId,uniqueID,UpdateType::ADD_RULE);
+        
         bcopy(&uniqueID, responsePacket + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
            + (count * sizeof(unsigned int)), sizeof(unsigned int));
         count++;
@@ -645,16 +648,11 @@ void Controller::handleKeywordSubscription() {
         std::to_string(requestPacketHeader.hostId));
 
       if(flag == 1){ /* Send Ack and Remove Rules */
-       /* TBD:: Send packet to remove rules to the switch. */
-       unsigned int count = 0; 
        responsePacketHeader.len = 0;
        replyPacketTypeHeader.packetType = PacketType::DESUBSCRIPTION_ACK;
        memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
        memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
         RESPONSE_HEADER_LEN);
-      /* TBD:: Find shortest path between all Pub to this Sub */
-      /* TBD:: For each UID in common send rule remove on the above
-        found shortest path to each switch */
       for(auto uniqueID : common) {
        /* Updating the map of UniqueID to Subscriber */
        auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueID);
@@ -668,6 +666,9 @@ void Controller::handleKeywordSubscription() {
          uniqueIdToSubsIterator->second.erase(requestPacketHeader.hostId);
         }
        }
+       /* Find shortest path between all Pub to this Sub for each uniqueId
+           And Install corresponding REMOVE rules on the switches */ 
+       installRules(responsePacketHeader.hostId,uniqueID,UpdateType::DELETE_RULE);
       }
       packetEngineIterator->second.send(responsePacket, PACKET_HEADER_LEN +
        RESPONSE_HEADER_LEN);
@@ -701,7 +702,6 @@ void Controller::handleKeywordSubscription() {
    }
   }
 }
-
 
 /*
  * Handle Network Update messages coming from switches 
@@ -795,6 +795,60 @@ void Controller::handleNetworkUpdate() {
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                 "Received Network Update packet from " + pending->interface);
   }
+}
+
+/*
+ * Install Rules on the Switches 
+ */
+void Controller::installRules(unsigned int destHost, unsigned int uniqueId, 
+  UpdateType type){
+  
+  char packet[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
+  struct PacketTypeHeader header;
+  struct RuleUpdatePacketHeader ruleUpdatePacketHeader;
+  
+  bzero(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
+  header.packetType = PacketType::RULE;
+  memcpy(packet, &header, PACKET_HEADER_LEN);
+  
+  auto uniqueIdToPubsIterator = uniqueIdToPublishers_.find(uniqueId);
+  
+  /* Predecessor map with key and value type of vertex_descriptor */
+  std::vector<vertexDescriptor_> predecessor(boost::num_vertices(graph_));
+  std::vector<int> distance(boost::num_vertices(graph_));
+   
+  /* Iterate through every publisher corresponding to the unique ID */
+		for(auto publisherId : uniqueIdToPubsIterator->second) {
+   /* dijkstra_shortest_paths- Compute shortest paths */
+   boost::dijkstra_shortest_paths(graph_, publisherId,
+     boost::predecessor_map(&predecessor[0]).distance_map(&distance[0]));
+   
+   /*Iterate through the shortest path and send rule updates to the switches */
+   for (unsigned int hostId = destHost; hostId != publisherId;
+    hostId = predecessor[hostId]) {
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+     "Sending Rule Install Packet On Switch= " +
+     std::to_string(predecessor[hostId]) +
+     " uniqueID= " + " " + std::to_string(uniqueId) +
+     " Next Hop= " + std::to_string(hostId));
+  
+     /* Prepare the rule update packet */
+     ruleUpdatePacketHeader.type = type;
+     ruleUpdatePacketHeader.uniqueId = uniqueId;
+     ruleUpdatePacketHeader.nodeId = hostId;
+     memcpy(packet + PACKET_HEADER_LEN, &ruleUpdatePacketHeader, 
+      RULE_UPDATE_HEADER_LEN);
+     
+     /* Prepare packetEngine and send */
+     auto packetEngine = ifToPacketEngine_.find(switchToIf_[predecessor[hostId]]);
+     if (packetEngine == ifToPacketEngine_.end()) {
+       Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
+        "cannot find packet engine for interface "
+        + switchToIf_[predecessor[hostId]]);
+     }
+     packetEngine->second.send(packet, RULE_UPDATE_HEADER_LEN);
+   }
+		}
 }
 
 /* Effectively the packet engine thread */

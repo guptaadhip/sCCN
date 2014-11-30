@@ -40,6 +40,9 @@ class Controller {
   /* TBD : Handle Keyword Registration */
   void handleNetworkUpdate();
 
+  /* Install Rules on the Switches */
+  void installRules(unsigned int, unsigned int, UpdateType);
+  
  private:
   unsigned int myId_;
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
