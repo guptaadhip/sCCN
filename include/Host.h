@@ -1,6 +1,6 @@
 #pragma once
 #include <mutex>
-
+#include <string>
 #include "include/MyInterfaces.h"
 #include "include/PacketEngine.h"
 #include "include/PacketHandler.h"
@@ -14,10 +14,43 @@
 class Host {
   public:
   Host(int myId);
+
+  /* 
+   * Registration thread 
+   */
+  void keywordRegistrationHandler();
+
+  /* 
+   * Deregistration thread 
+   */
+  void keywordDeregistrationHandler();
+
+  /*
+   * Queue Keyword Registration
+   */
+  void queueKeywordRegistration(PacketEntry *t);
+
+  /*
+   * Queue Keyword Deregistration
+   */
+  void queueKeywordDeregistration(PacketEntry *t);
+
+  /*
+   * Handle Control Packet Response
+   */
+  void handleControlResp();
+
+  /*
+   * Send the publishing map
+   */
+  std::unordered_map<std::string, unsigned int> getPublishingMap();
  
   private:
   unsigned int myId_;
   unsigned int sendHelloCounter_;
+  unsigned int mySwitch_;
+  std::string switchIf_;
+  unsigned int switchDownCount_;
  
   MyInterfaces myInterface_;
   KeywordToUniqueIdMap publisherKeywordData_;
@@ -29,6 +62,18 @@ class Host {
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
 
 	std::mutex keywordSeqLock_;
+
+  /* handle the host to switch registration response */
+  void handleRegistrationResp();
+  /* handle hello messages from switch */
+  void handleHello();
+  /* SendRegistration */
+  void sendRegistration();
+	/* Handle Hello Packets */
+	void handleHelloPackets();
+  /* Switch State Handler */
+  void switchStateHandler();
+
 	/* Thread to sequence Number Map */
 	std::unordered_map<unsigned int, std::string> keywordSeq_;
 	/* Handle Incoming Data Packets */
@@ -62,12 +107,15 @@ class Host {
 	/* Thread to Sniff for interface and packet engine */
 	void startSniffing(std::string, PacketEngine *packetEngine);
 
+  bool registered_;
+
 	/*
 	* Queues for the handler threads
 	*/
-	Queue RegRespQueue_;
-	Queue UnRegRespQueue_;
-	Queue SubRespQueue_;
-	Queue UnSubRespQueue_;
+	Queue controlPacketQueue_;
 	Queue dataQueue_;
+  Queue hostRegRespQueue_;
+  Queue helloQueue_;
+  Queue registerQueue_;
+  Queue deregisterQueue_;
 };

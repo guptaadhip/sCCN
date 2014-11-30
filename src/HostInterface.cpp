@@ -82,7 +82,7 @@ void HostInterface::readSocket() {
         bcopy(command + sizeof(char) + sizeof(unsigned int), pkt.packet, 
                                                         len * sizeof(char));
         pkt.len = len;
-        //host_->queueKeywordRegistration(&pkt);
+        host_->queueKeywordRegistration(&pkt);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                 "received publishing request for: " + std::string(pkt.packet));
       } else if (strncmp(command, "u", 1) == 0) {
@@ -90,7 +90,7 @@ void HostInterface::readSocket() {
         unsigned int uniqueId = 0;
         bcopy(command + sizeof(char), &uniqueId, sizeof(unsigned int));
         pkt.len = sizeof(unsigned int);
-        //host_->queueKeywordRegistration(&pkt);
+        host_->queueKeywordDeregistration(&pkt);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
               "received unpublishing request for: " + std::to_string(uniqueId));
       } else if (strncmp(command, "s", 1) == 0) {
