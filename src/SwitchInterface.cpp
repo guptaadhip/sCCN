@@ -121,8 +121,8 @@ void SwitchInterface::sendForwardTable() {
     bzero(data, BUFLEN);
     /* this is required bcopy doesnt work well when copying int to a char * */
     memcpy(data, &entry.first, sizeof(unsigned int));
-    bcopy(entry.second.c_str(), data + sizeof(unsigned int), 
-                                                    entry.second.length());
+    bcopy(&entry.second.interface, data + sizeof(unsigned int), 
+        entry.second.interface.length());
     sendData(data, strlen(data));
   }
   Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__,

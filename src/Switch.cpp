@@ -108,6 +108,7 @@ Switch::Switch(unsigned int myId) {
 
 }
 
+
 /*
  * Handle Host Registration Request
  */
@@ -155,7 +156,7 @@ void Switch::handleHostRegistration() {
       sendNetworkUpdate(UpdateType::ADD_HOST, regRequest.nodeId);
     }
     /*  
-     * Send ACK back to the switch
+     * Send ACK back to the host
      */
     auto entry = ifToPacketEngine_.find(pending->interface);
     if (entry == ifToPacketEngine_.end()) {
@@ -175,6 +176,7 @@ void Switch::handleHostRegistration() {
     entry->second.send(packet, len);
   }
 }
+
 
 /*
  * Handle Rule update packet
@@ -197,17 +199,91 @@ void Switch::handleRuleUpdate() {
                   "incorrect interface for the rule update packet");
       continue;
     }
+
+    /* parsing the incoming packet */
     RuleUpdatePacketHeader ruleHeader; 
-    bcopy(pending->packet + PACKET_HEADER_LEN, &ruleHeader, RULE_UPDATE_HEADER_LEN);
+    bcopy(pending->packet + PACKET_HEADER_LEN, &ruleHeader, 
+        RULE_UPDATE_HEADER_LEN);
+
+    /* preparing the response packet */
+    char responsePacket[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
+    bzero(responsePacket, PACKET_HEADER_LEN + NETWORK_UPDATE_HEADER_LEN);
+    struct PacketTypeHeader header;
+    memcpy(responsePacket + PACKET_HEADER_LEN, &ruleHeader, 
+        RULE_UPDATE_HEADER_LEN);
+
     if ((int) ruleHeader.type == (int) UpdateType::ADD_RULE) {
       /* add rule to the forwarding table */
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                  "write the code to add");
+                  "Got an ADD rule request from controller");
+      auto entry = forwardingTable_.find(ruleHeader.uniqueId);
+      /* if the rule is not present */
+      if (entry == forwardingTable_.end()) {
+      	/* new rule request -> ADD it */
+      	auto nodeToIfEntry = nodeIdToIf_.find(ruleHeader.nodeId);
+      	if (nodeToIfEntry == nodeIdToIf_.end()) {
+      		Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+      			"The node with nodeId = " + std::to_string(ruleHeader.nodeId) + 
+            " is not connected to" + " switch = " + std::to_string(myId_));
+      		/* Prepare NACK here */
+      		header.packetType = PacketType::RULE_NACK;
 
+      	} else {
+      	  /* make a new entry and insert it */
+      		HostIfCount hc;
+      	  hc.interface = nodeToIfEntry->second;
+      	  hc.count = 1;
+      	  forwardingTable_.insert(std::pair <unsigned int, struct HostIfCount> 
+              (ruleHeader.uniqueId, hc));
+          /* Prepare ACK here */
+      	  header.packetType = PacketType::RULE_ACK;
+      	}
+      } else {
+      	/* if the rule is present, just increment the count */
+      	forwardingTable_[ruleHeader.uniqueId].count++;
+      	/* Prepare ACK here */
+      	header.packetType = PacketType::RULE_ACK;
+      }
+
+      /* Response Packet Completed, now send it. */
+      memcpy(responsePacket, &header, PACKET_HEADER_LEN);
+
+      /* check if the switch is registered */
+      if(!registered_) {
+      	Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+                "Switch is not registered with any controller");
+      } else {
+      	auto packetEngineIterator = ifToPacketEngine_.find(controllerIf_);
+      	packetEngineIterator->second.send(responsePacket, 
+      		PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
+      }
     } else if ((int) ruleHeader.type == (int) UpdateType::DELETE_RULE) {
       /* delete rule to the forwarding table */
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                  "write the code to delete");
+                  "Got a DELETE rule request from controller");
+      auto entry = forwardingTable_.find(ruleHeader.uniqueId);
+      
+      /* if the rule is not present */
+      if (entry != forwardingTable_.end()) {
+      	if(--forwardingTable_[ruleHeader.uniqueId].count == 0) {
+      		forwardingTable_.erase (ruleHeader.uniqueId);
+      	}
+      }
+
+      /* send a ACK here */
+      header.packetType = PacketType::RULE_ACK;
+      /* Response Packet Completed, now send it. */
+      memcpy(responsePacket, &header, PACKET_HEADER_LEN);
+      /* check if the switch is registered */
+      if(!registered_) {
+      	Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+                "Switch is not registered with any controller");
+      } else {
+      	auto packetEngineIterator = ifToPacketEngine_.find(controllerIf_);
+      	packetEngineIterator->second.send(responsePacket, 
+      		PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
+      }
+      
     } else {
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "incorrect update type: " + (char) ruleHeader.type);
@@ -215,15 +291,18 @@ void Switch::handleRuleUpdate() {
   }
 }
 
+
 /*
  * Print the forwarding Table
  */
 void Switch::printForwardingTable() {
   Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
-              "Unique Id :: Interface");
+              "Unique Id :: Host Id :: Count");
   for (auto& entry : forwardingTable_) {
-    Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
-                std::to_string(entry.first) + " :: " + entry.second);
+    Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__,
+    	std::to_string(entry.first) + "         :: " + 
+    	entry.second.interface + "       :: " + 
+    	std::to_string(entry.second.count));
   }
 }
 
@@ -245,17 +324,15 @@ void Switch::handleData() {
     }
     DataPacketHeader dataHeader; 
     bcopy(pending->packet + PACKET_HEADER_LEN, &dataHeader, DATA_HEADER_LEN);
-    auto entries = forwardingTable_.equal_range(dataHeader.uniqueId);
-    for (auto entry = entries.first; entry != entries.second; ++entry) {
-      auto packetEngine = ifToPacketEngine_.find(entry->second);
-      if (packetEngine == ifToPacketEngine_.end()) {
-        Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
-                    "Packet Engine not found for " + entry->second);
+    auto entry = forwardingTable_.find(dataHeader.uniqueId);
+    auto packetEngine = ifToPacketEngine_.find(entry->second.interface);
+    if (packetEngine == ifToPacketEngine_.end()) {
+    	Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
+    		"Packet Engine not found for " + entry->second.interface);
         continue;
-      }
-      packetEngine->second.forward(pending->packet, 
-                          dataHeader.len + DATA_HEADER_LEN + PACKET_HEADER_LEN);
     }
+    packetEngine->second.forward(pending->packet, 
+    	dataHeader.len + DATA_HEADER_LEN + PACKET_HEADER_LEN);
   }
 }
 
@@ -622,6 +699,6 @@ unsigned int Switch::getSwitchId() const {
 /*
  * Return the switch forwarding table
  */
-std::unordered_multimap<unsigned int, std::string> Switch::getForwardingTable() const {
+std::unordered_map<unsigned int, struct HostIfCount> Switch::getForwardingTable() const {
   return forwardingTable_;
 }

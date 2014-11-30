@@ -6,6 +6,12 @@
 #include "include/Queue.h"
 #include "include/net.h"
 
+/* Structure used as value in the forawarding table map */
+struct HostIfCount {
+  std::string interface;
+  int count;
+};
+
 class Switch{
  public:
   Switch(unsigned int myId);
@@ -97,7 +103,7 @@ class Switch{
   /*
    * Returns the switch forwarding table
    */
-  std::unordered_multimap<unsigned int, std::string> getForwardingTable() const;
+  std::unordered_map<unsigned int, struct HostIfCount> getForwardingTable() const;
 
  private:
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
@@ -111,8 +117,8 @@ class Switch{
 
   std::vector<unsigned int> nodeList_;
   std::unordered_map<unsigned int, bool> nodeToHello_;
-  std::unordered_map <unsigned int, int> nodeToHelloCount_;
-  std::unordered_multimap<unsigned int, std::string> forwardingTable_;
+  std::unordered_map<unsigned int, int> nodeToHelloCount_;
+  std::unordered_map<unsigned int, struct HostIfCount> forwardingTable_;
   std::vector<unsigned int> connectedSwitchList_;
   std::vector<unsigned int> connectedHostList_;
   /* a map from unique ID of node (may be host or switch) to interface */
