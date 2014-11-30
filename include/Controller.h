@@ -55,26 +55,16 @@ class Controller {
   std::unordered_map<unsigned int, bool> switchToHello_;
   std::unordered_map <unsigned int, int> switchToHelloCount_;
 
-  /* 
-   * Data Structure to store the keywords to unique ID mapping
-   */
+  /* Data Structure to store the keywords to unique ID mapping */
   std::unordered_map<std::string, unsigned int> keywordsToUniqueId_;
-  /* 
-   * Data Structure to store the keyword to unique IDs mapping
-   */
+  
+  /* Data Structure to store the keyword to unique IDs mapping */
   std::unordered_map<std::string, std::set<unsigned int> > keywordToUniqueIds_;
-  /* 
-   * Data Structure to store the keywords to subscriber count
-  */
-  std::unordered_map<std::string, unsigned int> keywordToCount_;
-  /* 
-   * Data Structure to store the uniqueId to list of publishers
-  */
+
+  /* Data Structure to store the uniqueId to list of publishers */
   std::unordered_map<unsigned int, std::set<unsigned int> > uniqueIdToPublishers_;
-  /* 
-   * Data Structure to store the keyword to list of subscribers
-  */
-  std::unordered_map<std::string, std::set<unsigned int> > keywordToSubscribers_;
+  /* Data Structure to store the uniqueId to list of subscribers */
+  std::unordered_map<unsigned int, std::set<unsigned int> > uniqueIdToSubscribers_;
 
   /* 
    * Queues for the handler threads
@@ -98,12 +88,13 @@ class Controller {
             boost::no_property,      // graph properties
             boost::listS      // edge storage
       > graphStructure_;
-
+      
   weightProperty_ weight_;
-  typedef boost::graph_traits <graphStructure_>::vertex_descriptor
+  typedef boost::graph_traits <graphStructure_>::vertex_descriptor 
    vertexDescriptor_;
   typedef boost::graph_traits <graphStructure_>::edge_descriptor edgeDescriptor_;
   typedef std::pair<int, int> edge_;
-
+  
   graphStructure_ graph_;
+ 
 };
