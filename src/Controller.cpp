@@ -250,6 +250,9 @@ void Controller::handleKeywordRegistration(){
     /* Response Packet */
     struct PacketTypeHeader replyPacketTypeHeader;
     struct ResponsePacketHeader responsePacketHeader;
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+    "Received sequence no. = " + std::to_string(requestPacketHeader.sequenceNo));
+    
     responsePacketHeader.sequenceNo = requestPacketHeader.sequenceNo;
     responsePacketHeader.hostId = requestPacketHeader.hostId;
     bzero(responsePacket, BUFLEN);
@@ -345,6 +348,10 @@ void Controller::handleKeywordRegistration(){
       continue;
       
     } else if (packetTypeHeader.packetType == PacketType::DEREGISTRATION_REQ) {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                    "Received deregistration request packet from "
+                    + std::to_string(requestPacketHeader.hostId));
+
       if (requestPacketHeader.len == 0) {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "Received invalid request packet from "
@@ -411,6 +418,11 @@ void Controller::handleKeywordRegistration(){
          RESPONSE_HEADER_LEN);
          packetEngine->second.send(responsePacket,
          PACKET_HEADER_LEN + RESPONSE_HEADER_LEN);
+         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+        "Sending DEREGISTRATION_ACK to " + 
+        std::to_string(requestPacketHeader.hostId) + 
+        " with sequence no = " + std::to_string(requestPacketHeader.sequenceNo));
+         
          continue;
         } else if (flag == 2) {
          Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
