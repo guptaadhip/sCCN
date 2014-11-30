@@ -89,6 +89,7 @@ void HostInterface::readSocket() {
         bzero(pkt.packet, BUFLEN);
         unsigned int uniqueId = 0;
         bcopy(command + sizeof(char), &uniqueId, sizeof(unsigned int));
+        bcopy(command + sizeof(char), pkt.packet, sizeof(unsigned int));
         pkt.len = sizeof(unsigned int);
         host_->queueKeywordDeregistration(&pkt);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
