@@ -64,6 +64,11 @@ class Host {
    * Send the publishing map
    */
   std::unordered_map<std::string, unsigned int> getPublishingMap();
+  
+  /*
+   * Send the subscription map
+   */
+  std::unordered_map<std::string, std::vector<unsigned int>> getSubscriptionMap();
  
   private:
   unsigned int myId_;

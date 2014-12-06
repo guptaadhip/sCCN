@@ -119,3 +119,7 @@ void KeywordToUIdsMap::displayMap() {
 		//Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, it2->first + ": ");
 	}
 }
+
+std::unordered_map<std::string, std::vector<unsigned int>> KeywordToUIdsMap::getList() {
+	return keywordToUIds_;
+}

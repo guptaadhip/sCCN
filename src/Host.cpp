@@ -594,13 +594,48 @@ void Host::handleControlResp() {
 
         /* printing the deRegAckNackBook_  map */
         for(auto &entry : deRegAckNackBook_) {
-          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, " Dereg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + std::to_string(entry.second));
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, " Dereg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + std::to_string(entry.second)); 
         }
 
     } else if (packetTypeHeader.packetType == PacketType::SUBSCRIPTION_ACK ||
               packetTypeHeader.packetType == PacketType::SUBSCRIPTION_NACK) { 
 	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
 		              "got subscription response");
+
+        if(subsAckNackBook_.count(responsePacketHeader.sequenceNo) <= 0) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+            "Spurious Sequence no, not present in subsAckNackBook_ map  = "
+            + std::to_string(responsePacketHeader.sequenceNo));
+            continue;
+        }
+
+        std::string keyword = subsAckNackBook_[responsePacketHeader.sequenceNo];
+        if (packetTypeHeader.packetType == PacketType::SUBSCRIPTION_NACK) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "got nack while subscribing for keyword: " + keyword
+                  + " will try again");
+            continue;
+        }
+
+        if (responsePacketHeader.len <= 0) {
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                  "Invalid Subscription Response length found! keyword: "
+                  + keyword);
+          continue;
+        }        
+
+        unsigned int uniqueId = 0;
+        /* Remove the entry from the subsAckNackBook_ , to stop the request Thread */
+        subsAckNackBook_.erase(responsePacketHeader.sequenceNo);
+        for(unsigned int idx = 0; idx < responsePacketHeader.len; idx++) {
+          bcopy(pending->packet + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
+              + (idx * sizeof(unsigned int)), &uniqueId, sizeof(unsigned int));
+          subscriberKeywordData_.addKeyword(keyword, uniqueId);
+        }
+
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+            "Got subscription ack " + keyword + " " + std::to_string(uniqueId));
+
     } else if (packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_ACK ||
               packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_NACK) { 
 	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
@@ -636,4 +671,8 @@ void Host::sendHello() {
 
 std::unordered_map<std::string, unsigned int> Host::getPublishingMap() {
   return publisherKeywordData_.getList();
+}
+
+std::unordered_map<std::string, std::vector<unsigned int>> Host::getSubscriptionMap() {
+  return subscriberKeywordData_.getList();
 }

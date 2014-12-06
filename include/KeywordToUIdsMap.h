@@ -33,6 +33,8 @@ class KeywordToUIdsMap {
 	/* displayMap - Print all the data from the map */
 	void displayMap();
 
+	std::unordered_map<std::string, std::vector<unsigned int>> getList();
+
 	private:
 	std::unordered_map<std::string, std::vector<unsigned int>> keywordToUIds_;
 	std::unordered_map<unsigned int,int> uniqueIDCounterMap_;
