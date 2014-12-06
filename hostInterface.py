@@ -1,9 +1,22 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import signal, sys
 import socket
 import struct
 import os, os.path
 
 publishUidList = []
+subscribeUidList = []
+client = None
+
+def signal_handler(signal, frame):
+  print "Shutting down."
+  try:
+    client.send("quit")
+    client.close()
+  except:
+    print "Host down"
+  sys.exit(0)
 
 def printHelp():
   print "Commands:"
@@ -35,6 +48,24 @@ def getKeywords():
       continue
     except KeyboardInterrupt, k:
       return 
+
+def subscribeList(client):
+  global subscribeUidList
+  subscribeUidList = []
+  client.send("show subscribe keyword list")
+  data = client.recv(1024)
+  if data == "0":
+    print "No keywords subscribed"
+    return
+  print "List is:"
+  tmp = 0
+  count = int(data)
+  while tmp < count:
+    data = client.recv(1024)
+    idx = data.rfind(';')
+    subscribeUidList.append(str(data[idx + 1:]))
+    print data[:idx] + "\t" + data[idx + 1:]
+    tmp = tmp + 1
 
 def publishingList(client):
   global publishUidList
@@ -77,19 +108,20 @@ def publish(client):
   payload = "p" + struct.pack("I", listLen) + keywords
   client.send(payload)
 
-def subscribe():
+def subscribe(client):
   keywords, listLen = getKeywords()
   if not keywords:
     print "No keywords founds"
     return
   payload = "s" + struct.pack("I", listLen) + keywords
-  return payload
+  client.send(payload)
 
 print "Connecting..."
 if os.path.exists( "/tmp/hostSocket" ):
   client = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
   client.connect( "/tmp/hostSocket" )
   print "Ready."
+  signal.signal(signal.SIGINT, signal_handler)
   printHelp()
   while True:
     try:
@@ -108,9 +140,11 @@ if os.path.exists( "/tmp/hostSocket" ):
         elif "show publish keyword list" == x:
           publishingList(client)
           continue
+        elif "show subscribe keyword list" == x:
+          subscribeList(client)
+          continue
         elif "subscribe" == x:
-          data = subscribe()
-          client.send(data)
+          subscribe(client)
           continue
         elif "send data" == x:
           data = sendData()
@@ -124,10 +158,6 @@ if os.path.exists( "/tmp/hostSocket" ):
           print "Invalid Command"
           continue
         data = client.recv(1024);
-        if x == "show subscribe keyword list":
-          print "Subscribed for data: \n" + data
-        else:
-          print "Invalid command";
     except KeyboardInterrupt, k:
       print "Shutting down."
   client.close()

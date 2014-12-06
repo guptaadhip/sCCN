@@ -75,6 +75,8 @@ void HostInterface::readSocket() {
                     "quiting");
       } else if (strcmp(command, "show publish keyword list") == 0) {
         sendPublishList();
+      } else if (strcmp(command, "show subscribe keyword list") == 0) {
+        sendSubscribeList();
       } else if (strncmp(command, "p", 1) == 0) {
         bzero(pkt.packet, BUFLEN);
         unsigned int len = 0;
@@ -95,10 +97,13 @@ void HostInterface::readSocket() {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
               "received unpublishing request for: " + std::to_string(uniqueId));
       } else if (strncmp(command, "s", 1) == 0) {
-        bzero(data, BUFLEN);
+        bzero(pkt.packet, BUFLEN);
         unsigned int len = 0;
         bcopy(command + sizeof(char), &len, sizeof(unsigned int));
-        bcopy(command + sizeof(char) + sizeof(unsigned int), data, len);
+        bcopy(command + sizeof(char) + sizeof(unsigned int), pkt.packet, 
+                                                        len * sizeof(char));
+        pkt.len = len;
+        host_->queueKeywordSubscription(&pkt);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "received subscription request for: " + std::string(pkt.packet));
       } else {
@@ -108,6 +113,29 @@ void HostInterface::readSocket() {
     }
     close(cliSocket_);
   }
+}
+
+void HostInterface::sendSubscribeList() {
+  char data[BUFLEN];
+  bzero(data, BUFLEN);
+  /* this is tricky */
+  /* first send the length of the forward table */
+  auto subscribeMap = host_->getSubscriptionMap();
+  sprintf(data, "%ld", subscribeMap.size());
+  sendData(data, strlen(data));
+  sleep(1);
+  /* lets send the entries now */
+  /* this needs to be optimized */
+  for (auto entry : subscribeMap) {
+    bzero(data, BUFLEN);
+    /* this is required bcopy doesnt work well when copying int to a char * */
+    bcopy(entry.first.c_str(), data, entry.first.length());
+    sprintf(data + entry.first.length(), "%u", entry.second.front());
+    sendData(data, strlen(data));
+    sleep(1);
+  }
+  Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__,
+                    "sending subscribed list");
 }
 
 void HostInterface::sendPublishList() {

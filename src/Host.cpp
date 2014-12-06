@@ -86,8 +86,12 @@ Host::Host(int myId){
   auto switchStatethread = std::thread(&Host::switchStateHandler, this);
   /* Keyword Registration Handler thread */
   auto keywordRegthread = std::thread(&Host::keywordRegistrationHandler, this);
-  /* Keyword Registration Handler thread */
+  /* Keyword Deregistration Handler thread */
   auto keywordDergthrd = std::thread(&Host::keywordDeregistrationHandler, this);
+  /* Keyword Subscription Handler thread */
+  auto keywordSubthread = std::thread(&Host::keywordSubscriptionHandler, this);
+  /* Keyword Unsubscription Handler thread */
+  auto keywordUnsubthrd = std::thread(&Host::keywordUnsubscriptionHandler, this);
   /* Control Packet Response Handler thread */
   auto controlRespthread = std::thread(&Host::handleControlResp, this);
 
@@ -176,7 +180,8 @@ void Host::keywordDeregistrationHandler() {
     entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
                                                         + sizeof(unsigned int));
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-                  "sent deregistration request with seq no = " + std::to_string(requestPacketHeader.sequenceNo));
+                  "sent deregistration request with seq no = " 
+                  + std::to_string(requestPacketHeader.sequenceNo));
   }
 }
 
@@ -267,6 +272,8 @@ void Host::keywordSubscriptionHandler() {
     }
 
     auto keyword = std::string(pending->packet);
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "Got keyword from interface : " + keyword);
     unsigned int keywordLength = pending->len;
     /* Check if the keyword is already subscribed. */
 	  if(subscriberKeywordData_.keywordExists(keyword)) {
@@ -495,25 +502,6 @@ void Host::handleControlResp() {
       continue;
     }
   
-    /*if(deRegAckNackBook_.empty()) {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Dereg ACK-NACK book map is empty");
-    }
-
-    if(regAckNackBook_.empty()) {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Reg ACK-NACK book map is empty");
-    }*/
-
-    /* printing the regAckNackBook_  map */
-    /*for(auto &entry : regAckNackBook_) {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Reg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + entry.second);
-    }*/
-
-    /* printing the deRegAckNackBook_  map */
-    /*for(auto &entry : deRegAckNackBook_) {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, " Dereg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + std::to_string(entry.second));
-    }*/
-
-    
     /* if the response was for registration */
     if (packetTypeHeader.packetType == PacketType::REGISTRATION_ACK ||
         packetTypeHeader.packetType == PacketType::REGISTRATION_NACK) {
@@ -536,8 +524,10 @@ void Host::handleControlResp() {
             continue;
         }
         
-        /* Remove the entry from the regAckNackBook_ ,
-         * to stop the request Thread */
+        /* 
+         * Remove the entry from the regAckNackBook_ ,
+         * to stop the request Thread 
+         */
         regAckNackBook_.erase(responsePacketHeader.sequenceNo);
         unsigned int uniqueId;
         bcopy(pending->packet + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN, 
@@ -545,15 +535,6 @@ void Host::handleControlResp() {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
             "Got registration ack " + keyword + " " + std::to_string(uniqueId));
         publisherKeywordData_.addKeywordIDPair(keyword, uniqueId);
-
-        if(regAckNackBook_.empty()) {
-          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Reg ACK-NACK book map is empty");
-        }
-
-        /* printing the regAckNackBook_  map */
-        for(auto &entry : regAckNackBook_) {
-          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Reg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + entry.second);
-        }
 
     } else if (packetTypeHeader.packetType == PacketType::DEREGISTRATION_ACK ||
               packetTypeHeader.packetType == PacketType::DEREGISTRATION_NACK) {
@@ -588,15 +569,6 @@ void Host::handleControlResp() {
                     "from publisher keyword map");
         }
 
-        if(deRegAckNackBook_.empty()) {
-          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Dereg ACK-NACK book map is empty");
-        }
-
-        /* printing the deRegAckNackBook_  map */
-        for(auto &entry : deRegAckNackBook_) {
-          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, " Dereg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + std::to_string(entry.second)); 
-        }
-
     } else if (packetTypeHeader.packetType == PacketType::SUBSCRIPTION_ACK ||
               packetTypeHeader.packetType == PacketType::SUBSCRIPTION_NACK) { 
 	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
@@ -627,14 +599,17 @@ void Host::handleControlResp() {
         unsigned int uniqueId = 0;
         /* Remove the entry from the subsAckNackBook_ , to stop the request Thread */
         subsAckNackBook_.erase(responsePacketHeader.sequenceNo);
-        for(unsigned int idx = 0; idx < responsePacketHeader.len; idx++) {
+        for(unsigned int idx = 0; idx < responsePacketHeader.len; 
+                                            idx = idx + sizeof(unsigned int)) {
           bcopy(pending->packet + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN 
-              + (idx * sizeof(unsigned int)), &uniqueId, sizeof(unsigned int));
+              + idx, &uniqueId, sizeof(unsigned int));
           subscriberKeywordData_.addKeyword(keyword, uniqueId);
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+              "Got subscription ack " + keyword + " Uid: " + std::to_string(uniqueId));
         }
 
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-            "Got subscription ack " + keyword + " " + std::to_string(uniqueId));
+            "Got subscription ack " + keyword);
 
     } else if (packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_ACK ||
               packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_NACK) { 

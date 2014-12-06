@@ -606,7 +606,7 @@ void Controller::handleKeywordSubscription() {
        + std::to_string(requestPacketHeader.hostId));
      if(flag == 1){ /* Send Ack  and Install Rules */
       unsigned int count = 0; 
-      responsePacketHeader.len = common.size();
+      responsePacketHeader.len = common.size() * sizeof(unsigned int);
       replyPacketTypeHeader.packetType = PacketType::SUBSCRIPTION_ACK;
       memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
       memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
