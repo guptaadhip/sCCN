@@ -106,6 +106,16 @@ void HostInterface::readSocket() {
         host_->queueKeywordSubscription(&pkt);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "received subscription request for: " + std::string(pkt.packet));
+      } else if (strncmp(command, "d", 1) == 0) {
+        bzero(pkt.packet, BUFLEN);
+        unsigned int len = 0;
+        bcopy(command + sizeof(char), &len, sizeof(unsigned int));
+        bcopy(command + sizeof(char) + sizeof(unsigned int), pkt.packet, 
+                                                        len * sizeof(char));
+        pkt.len = len;
+        host_->queueKeywordUnsubscription(&pkt);
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                    "received unsubscription request for: " + std::string(pkt.packet));
       } else {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "Invalid Command: " + std::string(command));

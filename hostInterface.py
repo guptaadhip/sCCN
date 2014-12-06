@@ -6,7 +6,7 @@ import struct
 import os, os.path
 
 publishUidList = []
-subscribeUidList = []
+subsList = []
 client = None
 
 def signal_handler(signal, frame):
@@ -50,8 +50,8 @@ def getKeywords():
       return 
 
 def subscribeList(client):
-  global subscribeUidList
-  subscribeUidList = []
+  global subsList
+  subsList = []
   client.send("show subscribe keyword list")
   data = client.recv(1024)
   if data == "0":
@@ -63,8 +63,8 @@ def subscribeList(client):
   while tmp < count:
     data = client.recv(1024)
     idx = data.rfind(';')
-    subscribeUidList.append(str(data[idx + 1:]))
-    print data[:idx] + "\t" + data[idx + 1:]
+    subsList.append(str(data[:idx]))
+    print data[:idx]
     tmp = tmp + 1
 
 def publishingList(client):
@@ -108,6 +108,21 @@ def publish(client):
   payload = "p" + struct.pack("I", listLen) + keywords
   client.send(payload)
 
+def unsubscribe(client):
+  global subsList
+  subscribeList(client)
+  keywords, listLen = getKeywords()
+  if "" == keywords:
+    print "No keywords founds"
+    return
+  temp = keywords[:-1]
+  print temp
+  if temp not in subsList:
+    print "Invalid Unique Id"
+  else:
+    payload = "d" + struct.pack("I", listLen) + keywords
+    client.send(payload)
+
 def subscribe(client):
   keywords, listLen = getKeywords()
   if not keywords:
@@ -145,6 +160,9 @@ if os.path.exists( "/tmp/hostSocket" ):
           continue
         elif "subscribe" == x:
           subscribe(client)
+          continue
+        elif "unsubscribe" == x:
+          unsubscribe(client)
           continue
         elif "send data" == x:
           data = sendData()
