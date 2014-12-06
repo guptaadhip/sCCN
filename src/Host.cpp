@@ -615,8 +615,36 @@ void Host::handleControlResp() {
               packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_NACK) { 
 	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
 		              "got desubscription response");
-    }
 
+        if(unsubsAckNackBook_.count(responsePacketHeader.sequenceNo) <= 0) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+            "Spurious Sequence no, not present in unsubsAckNackBook_ map  = "
+            + std::to_string(responsePacketHeader.sequenceNo));
+            continue;
+        }
+
+        std::string unsubsKeyword = unsubsAckNackBook_[responsePacketHeader.sequenceNo];
+        if (packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_NACK) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+            "got nack while unsubscribing for keyword: "
+            + unsubsKeyword + " will try again");
+            continue;
+        }
+        
+        /* Remove the entry from the unsubsAckNackBook_ , to stop the request Thread */
+        unsubsAckNackBook_.erase(responsePacketHeader.sequenceNo);
+
+        /* Now delete the entry for the uniqueId from subscriberKeywordData_ map */
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+            "Got Unsubscription ack for keyword =  " + unsubsKeyword);
+
+        bool isDeleted = subscriberKeywordData_.removeKeyword(unsubsKeyword);
+        if(!isDeleted) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                    "Could not delete the keyword: " + unsubsKeyword +
+                    "from publisher keyword map");
+        }
+    }
   }
 }
 
