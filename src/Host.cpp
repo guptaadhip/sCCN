@@ -113,6 +113,20 @@ void Host::queueKeywordRegistration(PacketEntry *t) {
 }
 
 /*
+ * Queue Keyword Subscription
+ */
+void Host::queueKeywordSubscription(PacketEntry *t) {
+  subscriberQueue_.queuePacket(t);
+}
+
+/*
+ * Queue Keyword Unsubscription
+ */
+void Host::queueKeywordUnsubscription(PacketEntry *t) {
+  unsubscriberQueue_.queuePacket(t);
+}
+
+/*
  * Keyword deregistration handler
  */
 void Host::keywordDeregistrationHandler() {
@@ -170,6 +184,7 @@ void Host::keywordDeregistrationHandler() {
  * Keyword registration handler
  */
 void Host::keywordRegistrationHandler() {
+
   (void) registerQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
     auto pending = registerQueue_.packet_in_queue_.exchange(0, 
@@ -224,6 +239,134 @@ void Host::keywordRegistrationHandler() {
                                                               + keywordLength);
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "sent publish registration request for: " + keyword);
+
+  }
+}
+
+/*
+ * Keyword Subscription handler
+ */
+void Host::keywordSubscriptionHandler() {
+
+  (void) subscriberQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
+  while(true) {
+  	auto pending = subscriberQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) {
+      std::unique_lock<std::mutex> lock(subscriberQueue_.packet_ready_mutex_); 
+      if( !subscriberQueue_.packet_in_queue_) {
+        subscriberQueue_.packet_ready_.wait(lock);
+      }   
+      continue;
+    }
+
+    if (!registered_) {
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+                  "Cannot register as subscriber! No switch connected");
+      continue;
+    }
+
+    auto keyword = std::string(pending->packet);
+    unsigned int keywordLength = pending->len;
+    /* Check if the keyword is already subscribed. */
+	  if(subscriberKeywordData_.keywordExists(keyword)) {
+	  	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "Keyword : " + keyword + " has already been subscribed");
+	  	continue;
+	  }
+
+	  /* Send packet (with random sequence number) to register the keyword */
+	  char packet[PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength];
+	  bzero(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength);
+
+	  struct PacketTypeHeader header;
+	  header.packetType = PacketType::SUBSCRIPTION_REQ;
+
+	  struct RequestPacketHeader requestPacketHeader;
+	  requestPacketHeader.hostId = myId_;
+	  requestPacketHeader.sequenceNo = sequenceNumberGen();
+	  requestPacketHeader.len = keywordLength;
+
+	  /* Store the sequence no to keyword for subs ACK-NACK handling */
+    std::pair<unsigned int, std::string> newPair (requestPacketHeader.sequenceNo,
+    	keyword);
+    subsAckNackBook_.insert(newPair);
+
+    /* Copy data into the packet */
+    memcpy(packet, &header, PACKET_HEADER_LEN);
+    memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
+                                                          REQUEST_HEADER_LEN);
+	  memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
+                                                                keywordLength);
+    auto entry = ifToPacketEngine_.find(switchIf_);
+    entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
+                                                              + keywordLength);
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "sent subscription request for: " + keyword);
+  }
+}
+
+/*
+ * Keyword Unsubscription handler
+ */
+void Host::keywordUnsubscriptionHandler() {
+
+  (void) unsubscriberQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
+  while(true) {
+  	auto pending = unsubscriberQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+    if( !pending ) {
+      std::unique_lock<std::mutex> lock(unsubscriberQueue_.packet_ready_mutex_); 
+      if( !unsubscriberQueue_.packet_in_queue_) {
+        unsubscriberQueue_.packet_ready_.wait(lock);
+      }   
+      continue;
+    }
+
+    if (!registered_) {
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+                  "Cannot register as subscriber! No switch connected");
+      continue;
+    }
+
+    auto keyword = std::string(pending->packet);
+    unsigned int keywordLength = pending->len;
+
+    /* Check if the keyword is already subscribed. */
+	  if(!subscriberKeywordData_.keywordExists(keyword)) {
+	  	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "Keyword : " + keyword + " has not been subscribed");
+	  	continue;
+	  }
+
+	  /* Send packet (with random sequence number) to register the keyword */
+	  char packet[PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength];
+	  bzero(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength);
+
+	  struct PacketTypeHeader header;
+	  header.packetType = PacketType::DESUBSCRIPTION_REQ;
+
+	  struct RequestPacketHeader requestPacketHeader;
+	  requestPacketHeader.hostId = myId_;
+	  requestPacketHeader.sequenceNo = sequenceNumberGen();
+	  requestPacketHeader.len = keywordLength;
+
+	  /* Store the sequence no to keyword for subs ACK-NACK handling */
+    std::pair<unsigned int, std::string> newPair (requestPacketHeader.sequenceNo,
+    	keyword);
+    unsubsAckNackBook_.insert(newPair);
+
+    /* Copy data into the packet */
+    memcpy(packet, &header, PACKET_HEADER_LEN);
+    memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
+                                                          REQUEST_HEADER_LEN);
+	  memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
+                                                                keywordLength);
+    auto entry = ifToPacketEngine_.find(switchIf_);
+    entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
+                                                              + keywordLength);
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "sent subscription request for: " + keyword);
   }
 }
 

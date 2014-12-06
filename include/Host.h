@@ -25,6 +25,16 @@ class Host {
    */
   void keywordDeregistrationHandler();
 
+  /* 
+   * Subscription thread 
+   */
+  void keywordSubscriptionHandler();
+
+  /*
+  *  Unsubscription handler
+  */
+  void keywordUnsubscriptionHandler();
+
   /*
    * Queue Keyword Registration
    */
@@ -34,6 +44,16 @@ class Host {
    * Queue Keyword Deregistration
    */
   void queueKeywordDeregistration(PacketEntry *t);
+
+  /*
+   * Queue Keyword Subscription
+   */
+  void queueKeywordSubscription(PacketEntry *t);
+
+  /*
+   * Queue Keyword Unsubscription
+  */
+  void queueKeywordUnsubscription(PacketEntry *t);
 
   /*
    * Handle Control Packet Response
@@ -78,6 +98,11 @@ class Host {
   std::unordered_map<unsigned int, std::string> regAckNackBook_;
   /* Map for deregistration ACK and NACK book-keeping */
   std::unordered_map<unsigned int, unsigned int> deRegAckNackBook_;
+  /* Map for subscription ACK and NACK book-keeping */
+  std::unordered_map<unsigned int, std::string> subsAckNackBook_;
+  /* Map for unsubscription ACK and NACK book-keeping */
+  std::unordered_map<unsigned int, std::string> unsubsAckNackBook_;
+
   /* Handle Incoming Data Packets */
   void handleDataPackets();
   /* Handle Incoming Registration Response Packets */
@@ -120,4 +145,6 @@ class Host {
   Queue helloQueue_;
   Queue registerQueue_;
   Queue deregisterQueue_;
+  Queue subscriberQueue_;
+  Queue unsubscriberQueue_;
 };
