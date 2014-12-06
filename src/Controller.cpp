@@ -380,6 +380,11 @@ void Controller::handleKeywordRegistration(){
         * searching for the unique id in Map #1.
         * This is O(n) algorithm. See if it can be optimized.
         */
+        /* printing the keywordsToUniqueId_ map */
+        for(auto &entry1 : keywordsToUniqueId_) {
+           Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "keywordsToUniqueId_, "
+        		   "Keywords : " + entry1.first + " UniqueId : " + std::to_string(entry1.second));
+        }
         for(auto &entry : keywordsToUniqueId_){
            if (entry.second == uniqueId) {
            /* unique id found */
@@ -405,6 +410,8 @@ void Controller::handleKeywordRegistration(){
             }
            }
           }
+          if(flag)
+            break;
         }
         responsePacketHeader.len = 0;
         if (flag == 1) {

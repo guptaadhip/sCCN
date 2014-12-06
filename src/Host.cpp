@@ -145,17 +145,24 @@ void Host::keywordDeregistrationHandler() {
     requestPacketHeader.sequenceNo = sequenceNumberGen();
     requestPacketHeader.len = sizeof(unsigned int);
 
+    unsigned int k;
+    memcpy(&k, pending->packet, sizeof(unsigned int));
+    /* Store the SeqNo to Unique Id which is sent to be registered. */
+    std::pair<unsigned int, unsigned int> newPair
+        (requestPacketHeader.sequenceNo, k);
+    deRegAckNackBook_.insert(newPair);
+    
     /* Copy data into the packet */
     memcpy(packet, &header, PACKET_HEADER_LEN);
     memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
                                                           REQUEST_HEADER_LEN);
-	  memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
+    memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
                                                           sizeof(unsigned int));
     auto entry = ifToPacketEngine_.find(switchIf_);
     entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
                                                         + sizeof(unsigned int));
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-                  "sent deregistration request");
+                  "sent deregistration request with seq no = " + std::to_string(requestPacketHeader.sequenceNo));
   }
 }
 
@@ -202,10 +209,10 @@ void Host::keywordRegistrationHandler() {
     requestPacketHeader.sequenceNo = sequenceNumberGen();
     requestPacketHeader.len = keywordLength;
 
-    /* Store the Thread-SeqNo */
+    /* Store the sequence no to keyword for registration ACK-NACK handling */
     std::pair<unsigned int, std::string> newPair(requestPacketHeader.sequenceNo,
                                                                       keyword);
-    keywordSeq_.insert(newPair);
+    regAckNackBook_.insert(newPair);
     /* Copy data into the packet */
     memcpy(packet, &header, PACKET_HEADER_LEN);
     memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
@@ -332,49 +339,120 @@ void Host::handleControlResp() {
       }   
       continue;
     }
-		struct PacketTypeHeader packetTypeHeader;
-		bcopy(pending->packet, &packetTypeHeader,PACKET_HEADER_LEN);
+    
+    struct PacketTypeHeader packetTypeHeader;
+    bcopy(pending->packet, &packetTypeHeader,PACKET_HEADER_LEN);
 
-		struct ResponsePacketHeader responsePacketHeader;
-		bcopy(pending->packet + PACKET_HEADER_LEN, &responsePacketHeader, RESPONSE_HEADER_LEN);
+    struct ResponsePacketHeader responsePacketHeader;
+    bcopy(pending->packet + PACKET_HEADER_LEN, &responsePacketHeader, RESPONSE_HEADER_LEN);
 
-
-		/* Check if destined for this Host and seqNo exists */
-		if(responsePacketHeader.hostId != myId_) {
+    /* Check if destined for this Host and seqNo exists */
+    if(responsePacketHeader.hostId != myId_) {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "got a control response");
       continue;
     }
-		if(keywordSeq_.count(responsePacketHeader.sequenceNo) <= 0) {
-      continue;
+  
+    /*if(deRegAckNackBook_.empty()) {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Dereg ACK-NACK book map is empty");
     }
 
+    if(regAckNackBook_.empty()) {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Reg ACK-NACK book map is empty");
+    }*/
+
+    /* printing the regAckNackBook_  map */
+    /*for(auto &entry : regAckNackBook_) {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Reg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + entry.second);
+    }*/
+
+    /* printing the deRegAckNackBook_  map */
+    /*for(auto &entry : deRegAckNackBook_) {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, " Dereg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + std::to_string(entry.second));
+    }*/
+
+    
     /* if the response was for registration */
     if (packetTypeHeader.packetType == PacketType::REGISTRATION_ACK ||
         packetTypeHeader.packetType == PacketType::REGISTRATION_NACK) {
-	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
 		              "got registration response");
+        
+        if(regAckNackBook_.count(responsePacketHeader.sequenceNo) <= 0) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+            "Spurious Sequence no, not present in regAckNackBook_ map  = "
+            + std::to_string(responsePacketHeader.sequenceNo));
+            continue;
+        }
 
-		  std::string keyword = keywordSeq_[responsePacketHeader.sequenceNo];
-      
-      if (packetTypeHeader.packetType == PacketType::REGISTRATION_NACK) {
-	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-		              "got nack while registering for keyword: " + keyword
+        std::string keyword = regAckNackBook_[responsePacketHeader.sequenceNo];
+        
+        if (packetTypeHeader.packetType == PacketType::REGISTRATION_NACK) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "got nack while registering for keyword: " + keyword
                   + " will try again");
-        continue;
-      }
-
-		  /* Remove the entry from the keywordSeq_ , to stop the request Thread */
-		  keywordSeq_.erase(responsePacketHeader.sequenceNo);
-      unsigned int uniqueId;
-      bcopy(pending->packet + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN, 
+            continue;
+        }
+        
+        /* Remove the entry from the regAckNackBook_ ,
+         * to stop the request Thread */
+        regAckNackBook_.erase(responsePacketHeader.sequenceNo);
+        unsigned int uniqueId;
+        bcopy(pending->packet + PACKET_HEADER_LEN + RESPONSE_HEADER_LEN, 
                                               &uniqueId, sizeof(unsigned int));
-	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-		                              + "Got registration ack " + keyword + " " 
-                                  + std::to_string(uniqueId));
-      publisherKeywordData_.addKeywordIDPair(keyword, uniqueId);
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+            "Got registration ack " + keyword + " " + std::to_string(uniqueId));
+        publisherKeywordData_.addKeywordIDPair(keyword, uniqueId);
+
+        if(regAckNackBook_.empty()) {
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Reg ACK-NACK book map is empty");
+        }
+
+        /* printing the regAckNackBook_  map */
+        for(auto &entry : regAckNackBook_) {
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Reg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + entry.second);
+        }
+
     } else if (packetTypeHeader.packetType == PacketType::DEREGISTRATION_ACK ||
               packetTypeHeader.packetType == PacketType::DEREGISTRATION_NACK) {
-	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-		              "got deregistration response");
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                "got deregistration response");
+        
+        if(deRegAckNackBook_.count(responsePacketHeader.sequenceNo) <= 0) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+            "Spurious Sequence no, not present in deRegAckNackBook_ map  = "
+            + std::to_string(responsePacketHeader.sequenceNo));
+            continue;
+        }
+
+        unsigned int uniqueId = deRegAckNackBook_[responsePacketHeader.sequenceNo];
+        if (packetTypeHeader.packetType == PacketType::DEREGISTRATION_NACK) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+            "got nack while deregistering for uniqueId: "
+            + std::to_string(uniqueId) + " will try again");
+            continue;
+        }
+        
+        /* Remove the entry from the deRegAckNackBook_ , to stop the request Thread */
+        deRegAckNackBook_.erase(responsePacketHeader.sequenceNo);
+        /* Now delete the entry for the uniqueId from publisherKeyword map */
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+            "Got DeRegistration ack for uniqueId =  " + std::to_string(uniqueId));
+        bool isDeleted = publisherKeywordData_.removeKeywordIDPair
+            (publisherKeywordData_.fetchKeyword(uniqueId));
+        if(!isDeleted) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                    "Could not delete the uniqueId: " + std::to_string(uniqueId) +
+                    "from publisher keyword map");
+        }
+
+        if(deRegAckNackBook_.empty()) {
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "Dereg ACK-NACK book map is empty");
+        }
+
+        /* printing the deRegAckNackBook_  map */
+        for(auto &entry : deRegAckNackBook_) {
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, " Dereg ACK-NACK book map, Seq num : " + std::to_string(entry.first) + " String : " + std::to_string(entry.second));
+        }
 
     } else if (packetTypeHeader.packetType == PacketType::SUBSCRIPTION_ACK ||
               packetTypeHeader.packetType == PacketType::SUBSCRIPTION_NACK) { 
@@ -385,6 +463,7 @@ void Host::handleControlResp() {
 	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
 		              "got desubscription response");
     }
+
   }
 }
 

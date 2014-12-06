@@ -74,46 +74,48 @@ class Host {
   /* Switch State Handler */
   void switchStateHandler();
 
-	/* Thread to sequence Number Map */
-	std::unordered_map<unsigned int, std::string> keywordSeq_;
-	/* Handle Incoming Data Packets */
-	void handleDataPackets();
-	/* Handle Incoming Registration Response Packets */
-	void handleRegistrationResponsePacket();
-	/* Handle Incoming UnRegistration Response Packets */
-	void handleUnRegistrationResponsePacket();
-	/* Handle Incoming Subscribe Response Packets */
-	void handleSubscribeResponsePacket();
-	/* Handle Incoming UnSubscribe Response Packets */
-	void handleDeSubscribeResponsePacket();
-	/* sendHello - Send Hello packets to switch*/
-	void sendHello();
+  /* Map for registration ACK and NACK book-keeping */
+  std::unordered_map<unsigned int, std::string> regAckNackBook_;
+  /* Map for deregistration ACK and NACK book-keeping */
+  std::unordered_map<unsigned int, unsigned int> deRegAckNackBook_;
+  /* Handle Incoming Data Packets */
+  void handleDataPackets();
+  /* Handle Incoming Registration Response Packets */
+  void handleRegistrationResponsePacket();
+  /* Handle Incoming UnRegistration Response Packets */
+  void handleUnRegistrationResponsePacket();
+  /* Handle Incoming Subscribe Response Packets */
+  void handleSubscribeResponsePacket();
+  /* Handle Incoming UnSubscribe Response Packets */
+  void handleDeSubscribeResponsePacket();
+  /* sendHello - Send Hello packets to switch*/
+  void sendHello();
 
-	std::mutex userInterfaceLock_;
-	/* userInterface - Interact with the User */
-	void userInterface();
+  std::mutex userInterfaceLock_;
+  /* userInterface - Interact with the User */
+  void userInterface();
 
-	/* regsiterKeyword - Request to Register Keyword */
-	bool regsiterKeyword(std::string keyword, unsigned int sequenceNo);
-	/* unRegsiterKeyword - Request to Un-Register Keyword */
-	bool unRegsiterKeyword(std::string keyword, unsigned int sequenceNo);
-	/* publishData - Request to Publish Data */
-	void publishData(std::string keyword, std::string data);
-	/* subscribeKeyword - Subscribe the keyword */
-	bool subscribeKeyword(std::string keyword, unsigned int sequenceNo);
-	/* unSubscribeKeyword - Un-Subscribe the keyword */
-	bool unSubscribeKeyword(std::string keyword, unsigned int sequenceNo);
+  /* regsiterKeyword - Request to Register Keyword */
+  bool regsiterKeyword(std::string keyword, unsigned int sequenceNo);
+  /* unRegsiterKeyword - Request to Un-Register Keyword */
+  bool unRegsiterKeyword(std::string keyword, unsigned int sequenceNo);
+  /* publishData - Request to Publish Data */
+  void publishData(std::string keyword, std::string data);
+  /* subscribeKeyword - Subscribe the keyword */
+  bool subscribeKeyword(std::string keyword, unsigned int sequenceNo);
+  /* unSubscribeKeyword - Un-Subscribe the keyword */
+  bool unSubscribeKeyword(std::string keyword, unsigned int sequenceNo);
 
-	/* Thread to Sniff for interface and packet engine */
-	void startSniffing(std::string, PacketEngine *packetEngine);
+  /* Thread to Sniff for interface and packet engine */
+  void startSniffing(std::string, PacketEngine *packetEngine);
 
   bool registered_;
 
-	/*
-	* Queues for the handler threads
-	*/
-	Queue controlPacketQueue_;
-	Queue dataQueue_;
+  /*
+   * Queues for the handler threads
+  */
+  Queue controlPacketQueue_;
+  Queue dataQueue_;
   Queue hostRegRespQueue_;
   Queue helloQueue_;
   Queue registerQueue_;
