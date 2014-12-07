@@ -199,6 +199,8 @@ void Switch::handleRuleUpdate() {
                   "incorrect interface for the rule update packet");
       continue;
     }
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                  "got a packet for rule update");
 
     /* parsing the incoming packet */
     RuleUpdatePacketHeader ruleHeader; 

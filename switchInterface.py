@@ -20,10 +20,11 @@ if os.path.exists( "/tmp/switchSocket" ):
       x = raw_input( "> " )
       x = x.strip()
       if "" != x:
-        client.send( x ) 
         if "quit" == x:
+          client.send("quit")
           print "Shutting down."
           break
+        client.send( x ) 
         data = client.recv(2048);
         if x == "show switch id":
           print "Switch Id: " + data
@@ -53,7 +54,6 @@ if os.path.exists( "/tmp/switchSocket" ):
       print "Shutting down."
     except:
       print "Errored:", sys.exc_info()
-      continue
   client.close()
 else:
   print "Couldn't Connect!"
