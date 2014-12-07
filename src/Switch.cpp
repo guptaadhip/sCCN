@@ -235,6 +235,8 @@ void Switch::handleRuleUpdate() {
       	  hc.count = 1;
       	  forwardingTable_.insert(std::pair <unsigned int, struct HostIfCount> 
               (ruleHeader.uniqueId, hc));
+      	/* printing the printForwardingTable */
+      	printForwardingTable();
           /* Prepare ACK here */
       	  header.packetType = PacketType::RULE_ACK;
       	}
@@ -267,6 +269,8 @@ void Switch::handleRuleUpdate() {
       if (entry != forwardingTable_.end()) {
       	if(--forwardingTable_[ruleHeader.uniqueId].count == 0) {
       		forwardingTable_.erase (ruleHeader.uniqueId);
+      /* printing the printForwardingTable */
+           	printForwardingTable();
       	}
       }
 
@@ -289,6 +293,7 @@ void Switch::handleRuleUpdate() {
                   "incorrect update type: " + (char) ruleHeader.type);
     }
   }
+  printForwardingTable();
 }
 
 
@@ -296,10 +301,10 @@ void Switch::handleRuleUpdate() {
  * Print the forwarding Table
  */
 void Switch::printForwardingTable() {
-  Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
+  Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
               "Unique Id :: Host Id :: Count");
   for (auto& entry : forwardingTable_) {
-    Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__,
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
     	std::to_string(entry.first) + "         :: " + 
     	entry.second.interface + "       :: " + 
     	std::to_string(entry.second.count));

@@ -40,8 +40,11 @@ class Controller {
   /* TBD : Handle Keyword Registration */
   void handleNetworkUpdate();
 
-  /* Install Rules on the Switches */
+  /*Install/Uninstall Rules on the Switches during subscription/unsub'tion*/
   void installRules(unsigned int, unsigned int, UpdateType);
+	
+	/* Install/Uninstall Rules on the Switches during registration/dereg */
+  void installRulesRegistration(unsigned int, unsigned int, UpdateType);
   
  private:
   unsigned int myId_;

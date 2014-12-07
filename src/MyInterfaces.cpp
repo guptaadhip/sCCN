@@ -22,7 +22,7 @@ MyInterfaces::MyInterfaces() {
       continue;
     }
     /* for local vms */
-    if (interface.compare("eth0") == 0) {
+    if (interface.compare("eth1") == 0) {
       continue;
     }
     /* removing the control interface */

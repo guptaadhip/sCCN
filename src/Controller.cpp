@@ -262,10 +262,6 @@ void Controller::handleKeywordRegistration(){
 
     /* Handling Registration Request */
     if(packetTypeHeader.packetType == PacketType::REGISTRATION_REQ) {
-      /* TBD: If new publisher for existing keyword comes up and
-      *  subscriber count not zero
-      * then install rules for all subscribers
-      */
       if (requestPacketHeader.len == 0) {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "Received invalid request packet from "
@@ -325,6 +321,12 @@ void Controller::handleKeywordRegistration(){
         /* reply with the existing unique id */
         bcopy(&found->second, responsePacket + PACKET_HEADER_LEN +
               RESPONSE_HEADER_LEN, sizeof(unsigned int));
+				/* TBD: If new publisher for existing keyword comes up and
+				*  subscriber count not zero
+				* then install rules for all subscribers(Done)
+				*/
+				installRulesRegistration(responsePacketHeader.hostId,uniqueId,
+					UpdateType::ADD_RULE);
       }
       /* Updating the map of UniqueID to publishers */
       auto uniqueIdToPubsIterator = uniqueIdToPublishers_.find(uniqueId);
@@ -417,7 +419,11 @@ void Controller::handleKeywordRegistration(){
         if (flag == 1) {
          /* send ack */
          /* Delete entry for uniqueId from uniqueIdToPublishers_ */
-         /* TBD:: Remove rules from switches for that UniqueId from the switches*/
+         /* TBD:: Remove rules from switches for that UniqueId from the 
+						switches(Done)*/
+				 installRulesRegistration(responsePacketHeader.hostId,uniqueId,
+					UpdateType::DELETE_RULE);
+					
          uniqueIdToPublishers_.erase(uniqueId);
          replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_ACK;
          memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
@@ -816,12 +822,63 @@ void Controller::handleNetworkUpdate() {
   }
 }
 
+void Controller::installRulesRegistration(unsigned int publisherId, unsigned int uniqueId, 
+  UpdateType type){
+	
+	char packet[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
+  struct PacketTypeHeader header;
+  struct RuleUpdatePacketHeader ruleUpdatePacketHeader;
+  
+  bzero(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
+  header.packetType = PacketType::RULE;
+  memcpy(packet, &header, PACKET_HEADER_LEN);
+	
+	auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueId);
+	/* Predecessor map with key and value type of vertex_descriptor */
+  std::vector<vertexDescriptor_> predecessor(boost::num_vertices(graph_));
+  std::vector<int> distance(boost::num_vertices(graph_));
+	/* dijkstra_shortest_paths- Compute shortest paths */
+	boost::dijkstra_shortest_paths(graph_, publisherId,
+		boost::predecessor_map(&predecessor[0]).distance_map(&distance[0]));
+	
+	/*Iterate through the subscribers and send rule uninstall updates to switches*/
+	for(auto entry : uniqueIdToSubsIterator->second) {
+		Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+				"Controller::installRules: Uninstalling rules for Subscriber= " +
+				std::to_string(entry));
+		for (unsigned int hostId = entry; hostId != publisherId;
+			hostId = predecessor[hostId]) {
+			Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+				"Controller::installRules:Sending Rule Update Packet On Switch= " +
+				std::to_string(predecessor[hostId]) +
+				" uniqueID= " + " " + std::to_string(uniqueId) +
+				" Next Hop= " + std::to_string(hostId));
+			/* Prepare the rule update packet */
+			ruleUpdatePacketHeader.type = type;
+			ruleUpdatePacketHeader.uniqueId = uniqueId;
+			ruleUpdatePacketHeader.nodeId = hostId;
+			memcpy(packet + PACKET_HEADER_LEN, &ruleUpdatePacketHeader, 
+      RULE_UPDATE_HEADER_LEN);
+			/* Prepare packetEngine and send */
+			auto packetEngine = ifToPacketEngine_.find(switchToIf_[predecessor[hostId]]);
+			if (packetEngine == ifToPacketEngine_.end()) {
+      Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
+        "cannot find packet engine for interface "
+        + switchToIf_[predecessor[hostId]]);
+			}
+			packetEngine->second.send(packet, RULE_UPDATE_HEADER_LEN);			
+		}
+	}
+}
+
 /*
- * Install Rules on the Switches 
+ * Install/Uninstall Rules on the Switches 
  */
 void Controller::installRules(unsigned int destHost, unsigned int uniqueId, 
   UpdateType type){
-  
+
+  Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+	        "Controller::installRules- Entering function");
   char packet[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
   struct PacketTypeHeader header;
   struct RuleUpdatePacketHeader ruleUpdatePacketHeader;
@@ -837,37 +894,39 @@ void Controller::installRules(unsigned int destHost, unsigned int uniqueId,
   std::vector<int> distance(boost::num_vertices(graph_));
    
   /* Iterate through every publisher corresponding to the unique ID */
-		for(auto publisherId : uniqueIdToPubsIterator->second) {
+	for(auto publisherId : uniqueIdToPubsIterator->second) {
    /* dijkstra_shortest_paths- Compute shortest paths */
-   boost::dijkstra_shortest_paths(graph_, publisherId,
-     boost::predecessor_map(&predecessor[0]).distance_map(&distance[0]));
+		boost::dijkstra_shortest_paths(graph_, publisherId,
+			boost::predecessor_map(&predecessor[0]).distance_map(&distance[0]));
    
-   /*Iterate through the shortest path and send rule updates to the switches */
-   for (unsigned int hostId = destHost; hostId != publisherId;
-    hostId = predecessor[hostId]) {
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-     "Sending Rule Install Packet On Switch= " +
-     std::to_string(predecessor[hostId]) +
-     " uniqueID= " + " " + std::to_string(uniqueId) +
-     " Next Hop= " + std::to_string(hostId));
+		/*Iterate through the shortest path and send rule updates to the switches */
+		for (unsigned int hostId = destHost; predecessor[hostId] != publisherId;
+			hostId = predecessor[hostId]) {
+			Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+				"Sending Rule Update Packet On Switch= " +
+				std::to_string(predecessor[hostId]) + "interface"+switchToIf_[predecessor[hostId]]+
+				" uniqueID= " + " " + std::to_string(uniqueId) +
+				" Next Hop= " + std::to_string(hostId));
   
-     /* Prepare the rule update packet */
-     ruleUpdatePacketHeader.type = type;
-     ruleUpdatePacketHeader.uniqueId = uniqueId;
-     ruleUpdatePacketHeader.nodeId = hostId;
-     memcpy(packet + PACKET_HEADER_LEN, &ruleUpdatePacketHeader, 
+			/* Prepare the rule update packet */
+			ruleUpdatePacketHeader.type = type;
+			ruleUpdatePacketHeader.uniqueId = uniqueId;
+			ruleUpdatePacketHeader.nodeId = hostId;
+			memcpy(packet + PACKET_HEADER_LEN, &ruleUpdatePacketHeader, 
       RULE_UPDATE_HEADER_LEN);
      
-     /* Prepare packetEngine and send */
-     auto packetEngine = ifToPacketEngine_.find(switchToIf_[predecessor[hostId]]);
-     if (packetEngine == ifToPacketEngine_.end()) {
-       Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
+			/* Prepare packetEngine and send */
+			auto packetEngine = ifToPacketEngine_.find(switchToIf_[predecessor[hostId]]);
+			if (packetEngine == ifToPacketEngine_.end()) {
+      Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
         "cannot find packet engine for interface "
         + switchToIf_[predecessor[hostId]]);
-     }
-     packetEngine->second.send(packet, RULE_UPDATE_HEADER_LEN);
-   }
+			}
+			packetEngine->second.send(packet, RULE_UPDATE_HEADER_LEN);
 		}
+	}
+	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+		        "Controller::installRules- End of function");
 }
 
 /* Effectively the packet engine thread */
