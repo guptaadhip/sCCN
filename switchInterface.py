@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
+import string
+import signal
 import struct
 import socket
 import os, os.path
@@ -40,7 +42,7 @@ def getSwitchId(x, client):
   data = client.recv(2048);
   print "Switch Id: " + data
 
-def getForwardingTable():
+def getForwardingTable(x, client):
   client.send(x)
   data = client.recv(1024);
   if data == "0":
@@ -52,8 +54,8 @@ def getForwardingTable():
   while (tmp < count):
     data = client.recv(1024);
     uidx = data.find(';')
-    cidx = string.find(';', data, 0, uidx)
-    print data[:uidx], data[uidx, cidx], data[cidx:]
+    cidx = data.find(';', uidx + 1)
+    print data[:uidx], data[uidx + 1:cidx], data[cidx + 1:]
     tmp = tmp + 1
 
 
@@ -77,7 +79,7 @@ if os.path.exists( "/tmp/switchSocket" ):
           client.send(x)
           break
         elif "show forwarding table" == x:
-          getForwardingTable(x)
+          getForwardingTable(x, client)
         elif x == "show controller id":
           getControllerId(x, client)
         elif x == "show controller interface":
