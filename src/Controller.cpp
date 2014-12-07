@@ -38,6 +38,8 @@ Controller::Controller(unsigned int myId) {
 
   /* making packetEngine threads for all interfaces */
   for(auto it = ifToPacketEngine_.begin(); it != ifToPacketEngine_.end(); it++) {
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "Listening on interface: " + it->first);
     packetEngineThreads.push_back(std::thread(&Controller::startSniffing, this,
                                   it->first, &it->second));
   }

@@ -1,5 +1,6 @@
 #include "include/MyInterfaces.h"
 #include "include/Logger.h"
+#include "include/net.h"
 #include <sys/types.h>
 #include <netinet/in.h> 
 #include <string> 
@@ -12,8 +13,7 @@ MyInterfaces::MyInterfaces() {
   getifaddrs(&ifAddrStruct_);
   for (ifa = ifAddrStruct_; ifa != NULL; ifa = ifa->ifa_next) {
     /* The interface needs to have either IPv4 or IPv6 address */
-    if (ifa->ifa_addr->sa_family != AF_INET && 
-        ifa->ifa_addr->sa_family != AF_INET6) { 
+    if (ifa->ifa_addr->sa_family != AF_INET) { 
       continue;
     }
     std::string interface = std::string(ifa->ifa_name);
@@ -22,15 +22,17 @@ MyInterfaces::MyInterfaces() {
       continue;
     }
     /* for local vms */
-    if (interface.compare("eth1") == 0) {
-      continue;
-    }
-    /* removing the control interface */
-    /* Uncomment if running on deter and comment the above one
-    unsigned int ipAdr = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
-    if ((ipAdr & 0x0000ffff) == CONTROL_NW_IP) {
+    /*if (interface.compare("eth1") == 0) {
       continue;
     }*/
+    /* removing the control interface */
+    // Uncomment if running on deter and comment the above one
+    unsigned int ipAdr = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
+    if ((ipAdr & 0x0000ffff) == CONTROL_NW_IP) {
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                  "Skipping interface: " + interface);
+      continue;
+    }
     interfaces_.push_back(interface);
   }
   sort(interfaces_.begin(), interfaces_.end());
