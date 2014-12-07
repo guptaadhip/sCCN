@@ -115,15 +115,18 @@ void SwitchInterface::sendForwardTable() {
   auto forwardingTable = switch_->getForwardingTable();
   sprintf(data, "%ld", forwardingTable.size());
   sendData(data, strlen(data));
+  sleep(1);
   /* lets send the entries now */
   /* this needs to be optimized */
   for (auto entry : forwardingTable) {
     bzero(data, BUFLEN);
     /* this is required bcopy doesnt work well when copying int to a char * */
     memcpy(data, &entry.first, sizeof(unsigned int));
-    bcopy(&entry.second.interface, data + sizeof(unsigned int), 
-        entry.second.interface.length());
-    sendData(data, strlen(data));
+    memcpy(data + sizeof(unsigned int), &entry.second.count, sizeof(unsigned int));
+    sendData(data, BUFLEN);
+    memcpy(data + sizeof(unsigned int) + sizeof(unsigned int), entry.second.interface.c_str(), entry.second.interface.length());
+    sendData(data, BUFLEN);
+    sleep(1);
   }
   Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__,
                     "sending forward table");

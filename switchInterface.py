@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import sys
+import struct
 import socket
 import os, os.path
 
@@ -29,16 +31,17 @@ if os.path.exists( "/tmp/switchSocket" ):
           if data == "0":
             print "No entries in the forwarding table"
             continue
-          print ("Unique Id : Interface");
-          count = 0;
-          while (count < data):
+          print ("Unique Id\tCount\tInterface");
+          tmp = 0
+          count = int(data)
+          while (tmp < count):
             # If entries exist lets read them
             data = client.recv(2048);
             # need to handle this data correctly
-            uid = data[:4]
-            data = data[data:]
-            print uid + " : " +  data
-            count = count + 1
+            uid = struct.unpack('II', data[:8])
+            data = data[8:].decode('ascii').encode('utf-8')
+            print '%u\t%u\t%s' % (uid[0], uid[1], data)
+            tmp = tmp + 1
         elif x == "show controller id":
           if data == "0":
             print "Controller: Not connected"
@@ -48,6 +51,9 @@ if os.path.exists( "/tmp/switchSocket" ):
           print "Controller Interface: " + data
     except KeyboardInterrupt, k:
       print "Shutting down."
+    except:
+      print "Errored:", sys.exc_info()
+      continue
   client.close()
 else:
   print "Couldn't Connect!"
