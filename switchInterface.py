@@ -4,56 +4,92 @@ import struct
 import socket
 import os, os.path
 
-print "Connecting..."
-if os.path.exists( "/tmp/switchSocket" ):
-  client = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
-  client.connect( "/tmp/switchSocket" )
-  print "Ready."
+client = None
+
+def signal_handler(signal, frame):
+  print "Shutting down."
+  try:
+    client.send("quit")
+    client.close()
+  except:
+    print "Switch down"
+  sys.exit(0)
+
+def printHelp():
   print "Commands:"
   print "\tquit"
   print "\tshow switch id"
   print "\tshow controller id"
   print "\tshow controller interface"
   print "\tshow forwarding table"
+
+def getControllerInterface(x, client):
+  client.send(x)
+  data = client.recv(1024);
+  print "Controller Interface: " + data
+
+def getControllerId(x, client):
+  client.send(x)
+  data = client.recv(1024);        
+  if data == "0":
+    print "Controller: Not connected"
+    return
+  print "Controller Id: " + data
+
+def getSwitchId(x, client):
+  data = client.recv(2048);
+  print "Switch Id: " + data
+
+def getForwardingTable():
+  client.send(x)
+  data = client.recv(1024);
+  if data == "0":
+    print "No entries in the forwarding table"
+    return
+  print ("Unique Id\tCount\tInterface");
+    tmp = 0
+    count = int(data)
+    while (tmp < count):
+      data = client.recv(1024);
+      uidx = data.find(';')
+      cidx = string.find(';', data, 0, uidx)
+      print data[:uidx], data[uidx, cidx], data[cidx:]
+      tmp = tmp + 1
+
+
+print "Connecting..."
+if os.path.exists( "/tmp/switchSocket" ):
+  client = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
+  client.connect( "/tmp/switchSocket" )
+  print "Ready."
+  signal.signal(signal.SIGINT, signal_handler)
+  printHelp()
   while True:
     try:
       x = raw_input( "> " )
       x = x.strip()
       if "" != x:
-        if "quit" == x:
-          client.send("quit")
+        if "help" == x:
+          printHelp()
+          continue
+        elif "quit" == x:
           print "Shutting down."
+          client.send(x)
           break
-        client.send( x ) 
-        data = client.recv(2048);
-        if x == "show switch id":
-          print "Switch Id: " + data
-        elif x == "show forwarding table":
-          if data == "0":
-            print "No entries in the forwarding table"
-            continue
-          print ("Unique Id\tCount\tInterface");
-          tmp = 0
-          count = int(data)
-          while (tmp < count):
-            # If entries exist lets read them
-            data = client.recv(2048);
-            # need to handle this data correctly
-            uid = struct.unpack('II', data[:8])
-            data = data[8:].decode('ascii').encode('utf-8')
-            print '%u\t%u\t%s' % (uid[0], uid[1], data)
-            tmp = tmp + 1
+        elif "show forwarding table" == x:
+          getForwardingTable(x)
         elif x == "show controller id":
-          if data == "0":
-            print "Controller: Not connected"
-            continue
-          print "Controller Id: " + data
+          getControllerId(x, client)
         elif x == "show controller interface":
-          print "Controller Interface: " + data
+          getControllerInterface(x, client)
+        elif x == "show controller interface":
+          getSwitchId(x, client)
+        else:
+          print "Invalid Command"
+          continue
     except KeyboardInterrupt, k:
       print "Shutting down."
-    except:
-      print "Errored:", sys.exc_info()
+      break
   client.close()
 else:
   print "Couldn't Connect!"
