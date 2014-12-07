@@ -46,15 +46,15 @@ def getForwardingTable():
   if data == "0":
     print "No entries in the forwarding table"
     return
-  print ("Unique Id\tCount\tInterface");
-    tmp = 0
-    count = int(data)
-    while (tmp < count):
-      data = client.recv(1024);
-      uidx = data.find(';')
-      cidx = string.find(';', data, 0, uidx)
-      print data[:uidx], data[uidx, cidx], data[cidx:]
-      tmp = tmp + 1
+  print "Unique Id", "Count", "Interface"
+  tmp = 0
+  count = int(data)
+  while (tmp < count):
+    data = client.recv(1024);
+    uidx = data.find(';')
+    cidx = string.find(';', data, 0, uidx)
+    print data[:uidx], data[uidx, cidx], data[cidx:]
+    tmp = tmp + 1
 
 
 print "Connecting..."
