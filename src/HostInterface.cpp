@@ -51,7 +51,6 @@ void HostInterface::readSocket() {
   }
   while (true) {
     PacketEntry pkt;
-    char data[BUFLEN];
     bool done = false;
     int rc;
     remoteLen = sizeof(remote);

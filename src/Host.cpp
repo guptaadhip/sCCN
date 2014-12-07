@@ -7,6 +7,8 @@
 #include <vector>
 #include <cstring>
 #include <unistd.h>
+#include <algorithm>
+#include <string>
 
 #include "include/HostInterface.h"
 #include "include/net.h"
@@ -18,7 +20,7 @@ using namespace std;
 /*
  *	Host - Class Constructor
  */
-Host::Host(int myId){
+Host::Host(int myId) {
 	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
 		"Entering Host.");
 	std::vector<std::thread> packetEngineThreads;
@@ -52,7 +54,7 @@ Host::Host(int myId){
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
 		((unsigned short) PacketType::HELLO, &helloQueue_));
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
-		((unsigned short) PacketType::DATA, &dataQueue_));
+		((unsigned short) PacketType::DATA, &sendDataQueue_));
 
   /* Control packet queue */
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
@@ -79,21 +81,25 @@ Host::Host(int myId){
   auto sendRegReq = std::thread(&Host::sendRegistration, this);
 
   /* Handler thread */
-  auto regRespthread = std::thread(&Host::handleRegistrationResp, this);
+  auto regRespThread = std::thread(&Host::handleRegistrationResp, this);
   /* Handle Switch Hello thread */
-  auto helloHandlerthread = std::thread(&Host::handleHello, this);
+  auto helloHandlerThread = std::thread(&Host::handleHello, this);
   /* Switch State Handler thread */
-  auto switchStatethread = std::thread(&Host::switchStateHandler, this);
+  auto switchStateThread = std::thread(&Host::switchStateHandler, this);
   /* Keyword Registration Handler thread */
-  auto keywordRegthread = std::thread(&Host::keywordRegistrationHandler, this);
+  auto keywordRegThread = std::thread(&Host::keywordRegistrationHandler, this);
   /* Keyword Deregistration Handler thread */
-  auto keywordDergthrd = std::thread(&Host::keywordDeregistrationHandler, this);
+  auto keywordDergThread = std::thread(&Host::keywordDeregistrationHandler, this);
   /* Keyword Subscription Handler thread */
-  auto keywordSubthread = std::thread(&Host::keywordSubscriptionHandler, this);
+  auto keywordSubThread = std::thread(&Host::keywordSubscriptionHandler, this);
   /* Keyword Unsubscription Handler thread */
-  auto keywordUnsubthrd = std::thread(&Host::keywordUnsubscriptionHandler, this);
+  auto keywordUnsubThread = std::thread(&Host::keywordUnsubscriptionHandler, this);
   /* Control Packet Response Handler thread */
-  auto controlRespthread = std::thread(&Host::handleControlResp, this);
+  auto controlRespThread = std::thread(&Host::handleControlResp, this);
+  /* Send Data Handler thread */
+  auto sendDataThread = std::thread(&Host::sendDataHandler, this);
+  /* Receive Data Handler thread */
+  auto recvDataThread = std::thread(&Host::recvDataHandler, this);
 
   /*  
    * send hello thread
@@ -128,6 +134,20 @@ void Host::queueKeywordSubscription(PacketEntry *t) {
  */
 void Host::queueKeywordUnsubscription(PacketEntry *t) {
   unsubscriberQueue_.queuePacket(t);
+}
+
+/*
+ * Queue for sending data (Publisher role)
+ */
+void Host::queueDataForSending(PacketEntry *t) {
+  sendDataQueue_.queuePacket(t);
+}
+
+/*
+ * Queue for receiving data (Subscriber role)
+ */
+void Host::queueDataForReceiving(PacketEntry *t) {
+  recvDataQueue_.queuePacket(t);
 }
 
 /*
@@ -647,6 +667,103 @@ void Host::handleControlResp() {
     }
   }
 }
+
+
+/*
+* Handler for sending data packets. 
+*/
+void Host::sendDataHandler() {
+	while(true) {
+		auto pending = sendDataQueue_.packet_in_queue_.exchange(0, 
+                                                    std::memory_order_consume);
+		if( !pending ) {
+      std::unique_lock<std::mutex> lock(sendDataQueue_.packet_ready_mutex_); 
+      if( !sendDataQueue_.packet_in_queue_) {
+        sendDataQueue_.packet_ready_.wait(lock);
+      }   
+      continue;
+    }
+
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "Sending a data packet....");
+
+    /* Sanity check - to see if the switch is registered or not */
+    if (!registered_) {
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+                  "Cannot send data ! No switch connected");
+      continue;
+    }
+
+    /* Data Packet Header filling up */ 
+    struct DataPacketHeader dataPacketHeader;
+    dataPacketHeader.sequenceNo = sequenceNumberGen();
+    bcopy(pending->packet, &dataPacketHeader.uniqueId, sizeof(unsigned int)); 
+    if(publisherKeywordData_.fetchKeyword(dataPacketHeader.uniqueId).compare("") == 0) {
+    	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "Keyword does not exist in publishing map");
+      continue;
+    }
+    bcopy(pending->packet + sizeof(unsigned int),
+    	 &dataPacketHeader.len, sizeof(unsigned int));
+    if(dataPacketHeader.len == 0) {
+    	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "Data size = 0 ! Try sending data again");
+      continue;
+    }
+
+    char packet[BUFLEN];
+    bzero(packet, BUFLEN);
+
+    /* putting the payload */
+    bcopy(pending->packet + (2 * sizeof(unsigned int)), 
+    	packet + PACKET_HEADER_LEN + DATA_HEADER_LEN, dataPacketHeader.len);
+
+    /* Packet Type Header filling up */
+    struct PacketTypeHeader header;
+	  header.packetType = PacketType::DATA;
+
+    /* Copy everything into a packet and send it. */
+    memcpy(packet, &header, PACKET_HEADER_LEN);
+    memcpy(packet + PACKET_HEADER_LEN, &dataPacketHeader, DATA_HEADER_LEN);
+    auto entry = ifToPacketEngine_.find(switchIf_);
+    entry->second.send(packet, BUFLEN);
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "Sent the data.");
+  }
+}
+
+/*
+* Handle Incoming Data Packets
+*/
+void Host::recvDataHandler() {
+	(void) recvDataQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
+	while(true) {
+		auto pending = recvDataQueue_.packet_in_queue_.exchange(0, 
+			std::memory_order_consume);
+		if( !pending ) { 
+			std::unique_lock<std::mutex> lock(recvDataQueue_.packet_ready_mutex_);    
+			if( !recvDataQueue_.packet_in_queue_) {
+				recvDataQueue_.packet_ready_.wait(lock);
+			}
+			continue;
+		}
+
+		Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "Received a data packet....");
+
+		struct DataPacketHeader dataPacketHeader;
+		bcopy(pending->packet + PACKET_HEADER_LEN, &dataPacketHeader,
+				DATA_HEADER_LEN);
+
+		char data[dataPacketHeader.len];
+		bcopy(pending->packet + PACKET_HEADER_LEN + DATA_HEADER_LEN, data,									
+		      dataPacketHeader.len);
+		
+    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                  "Received Data : " + std::string(data));	
+	}
+}
+
 
 /*
  * Send Hello Thread

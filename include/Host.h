@@ -56,10 +56,30 @@ class Host {
   void queueKeywordUnsubscription(PacketEntry *t);
 
   /*
+   * Queue For Sending data (Publisher role)
+  */
+  void queueDataForSending(PacketEntry *t);
+
+  /*
+   * Queue For Received data (Subscriber role)
+  */
+  void queueDataForReceiving(PacketEntry *t);
+
+  /*
    * Handle Control Packet Response
-   */
+  */
   void handleControlResp();
 
+  /*
+   * Handler for sending data 
+  */
+  void sendDataHandler();
+
+  /*
+   * Handler for receiving data 
+  */
+  void recvDataHandler();
+  
   /*
    * Send the publishing map
    */
@@ -145,7 +165,8 @@ class Host {
    * Queues for the handler threads
   */
   Queue controlPacketQueue_;
-  Queue dataQueue_;
+  Queue sendDataQueue_;
+  Queue recvDataQueue_;
   Queue hostRegRespQueue_;
   Queue helloQueue_;
   Queue registerQueue_;
