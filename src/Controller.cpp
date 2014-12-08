@@ -87,6 +87,16 @@ Controller::Controller(unsigned int myId) {
   for (auto& joinThreads : packetEngineThreads) joinThreads.join();
 }
 
+void Controller::printMap(std::unordered_map<std::string, std::set<unsigned int>> input){
+	for(auto &iterator : input) {
+		for(auto itr : iterator.second){
+			Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+							"Controller::printMap : KeywordToUniqueIds_ keyword: "
+							+ iterator.first+ "		UniqueId " + std::to_string(itr));
+		}
+	}
+}
+
 /*
  * Thead to manage Switch State based on the hello message received
  */
@@ -410,6 +420,8 @@ void Controller::handleKeywordRegistration(){
              continue;
             } else {
              flag = 2;
+             Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+                 "Setting flag to 2! Item not present in map :" + item);
              break;
             }
            }
@@ -523,10 +535,6 @@ void Controller::handleKeywordRegistration(){
  * Handle Keyword Subscription
 */
 void Controller::handleKeywordSubscription() {
-	char payload[BUFLEN]; /* get payload into this */
-	char responsePacket[BUFLEN]; 
-	bool isFirst = false;
-
   /* first one needs to be removed */
   (void) subscriptionQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
@@ -540,9 +548,16 @@ void Controller::handleKeywordSubscription() {
       continue;
     }
 
+
+    char payload[BUFLEN]; /* get payload into this */
+    char responsePacket[BUFLEN]; 
+    bool isFirst = false;
+    
     struct RequestPacketHeader requestPacketHeader;
     struct PacketTypeHeader packetTypeHeader;
-
+    
+    bzero(payload, BUFLEN); /* zeroing the payload */
+   
     /* Parsing the request packet just received */
     bcopy(pending->packet, &packetTypeHeader, PACKET_HEADER_LEN);
     bcopy(pending->packet + PACKET_HEADER_LEN, 
@@ -563,17 +578,20 @@ void Controller::handleKeywordSubscription() {
     bzero(responsePacket, BUFLEN); /* zeroing the response packet */
     struct PacketTypeHeader replyPacketTypeHeader;
     struct ResponsePacketHeader responsePacketHeader;
-  	responsePacketHeader.sequenceNo = requestPacketHeader.sequenceNo;
-  	responsePacketHeader.hostId = requestPacketHeader.hostId;
+    responsePacketHeader.sequenceNo = requestPacketHeader.sequenceNo;
+    responsePacketHeader.hostId = requestPacketHeader.hostId;
 
   	/* Prepare the packet engine */
-  	auto packetEngineIterator = ifToPacketEngine_.find(pending->interface);
-   if(packetTypeHeader.packetType == PacketType::SUBSCRIPTION_REQ || 
+    auto packetEngineIterator = ifToPacketEngine_.find(pending->interface);
+    if(packetTypeHeader.packetType == PacketType::SUBSCRIPTION_REQ || 
      packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_REQ) {
     flag = 0;
 
     /* Common Pub * UnPub - Finding Intersection of keywords  -- Start */
     boost::split(keywordList, keywords, boost::is_any_of(";"));
+    /*Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+    		  "Keywords : " + keywords); */
+
     isFirst = false;
     std::set<unsigned int> common;
     std::set<unsigned int> *outer = &common;
@@ -602,12 +620,17 @@ void Controller::handleKeywordSubscription() {
        }
      }else{
       flag = 2;
+      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+    		  "Setting flag to 2! Item not present in map :" + keyword);
+      //printMap(keywordToUniqueIds_);
       break;
      }
     }
     /* No intersection of UniqueId found, Send Nack */
     if(common.empty()){
      flag = 2;
+     Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+            "Setting flag to 2! Common is empty.");
     }
     /* Common Pub * UnPub - Finding Intersection of keywords  -- End */
     if(packetTypeHeader.packetType == PacketType::SUBSCRIPTION_REQ) {
@@ -874,7 +897,7 @@ void Controller::installRulesRegistration(unsigned int publisherId, unsigned int
         "cannot find packet engine for interface "
         + switchToIf_[predecessor[hostId]]);
 			}
-   sleep(1);
+   //sleep(1);
 			packetEngine->second.send(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);			
 		}
 	}
@@ -937,7 +960,7 @@ void Controller::installRules(unsigned int destHost, unsigned int uniqueId,
         "cannot find packet engine for interface "
         + switchToIf_[predecessor[hostId]]);
 			}
-   sleep(1);
+   //sleep(1);
 			packetEngine->second.send(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
 		}
 	}

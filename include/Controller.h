@@ -46,6 +46,9 @@ class Controller {
 	/* Install/Uninstall Rules on the Switches during registration/dereg */
   void installRulesRegistration(unsigned int, unsigned int, UpdateType);
   
+  /*Print map(keywordToUniqueIds_)*/
+  void printMap(std::unordered_map<std::string, std::set<unsigned int>> input);
+
  private:
   unsigned int myId_;
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
