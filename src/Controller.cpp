@@ -71,10 +71,6 @@ Controller::Controller(unsigned int myId) {
           ((unsigned short) PacketType::SUBSCRIPTION_REQ, &subscriptionQueue_));
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
         ((unsigned short) PacketType::DESUBSCRIPTION_REQ, &subscriptionQueue_));
-  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
-        ((unsigned short) PacketType::RULE_ACK, &ruleResponseQueue_));
-  packetTypeToQueue_.insert(std::pair<unsigned short, Queue *> 
-        ((unsigned short) PacketType::RULE_NACK, &ruleResponseQueue_));
 
   /*
    * Create Queue Handler
@@ -86,7 +82,6 @@ Controller::Controller(unsigned int myId) {
   auto networkUpdateThread = std::thread(&Controller::handleNetworkUpdate, this);
   auto keywordRegThread = std::thread(&Controller::handleKeywordRegistration, this);
   auto keywordSubsThread = std::thread(&Controller::handleKeywordSubscription, this);
-  auto RuleRespThread = std::thread(&Controller::handleRuleResponse, this);
   packetHandler_.processQueue(&packetTypeToQueue_);
   /* waiting for all the packet engine threads */
   for (auto& joinThreads : packetEngineThreads) joinThreads.join();
@@ -115,30 +110,6 @@ void Controller::switchStateHandler() {
       }
     }
     sleep(1);
-  }
-}
-
-/*
- * Handle Rule Response
- */
-void Controller::handleRuleResponse() {
-  /* first one needs to be removed */
-  (void) ruleResponseQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
-  while(true) {
-    auto pending = ruleResponseQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock(ruleResponseQueue_.packet_ready_mutex_);    
-      if( !ruleResponseQueue_.packet_in_queue_) {
-        ruleResponseQueue_.packet_ready_.wait(lock);
-      }
-      continue;
-    }
-    struct PacketTypeHeader rulePacketTypeHeader;
-    bcopy(pending->packet, &rulePacketTypeHeader, PACKET_HEADER_LEN);
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                "Received update from  " 
-            + std::to_string((unsigned int) rulePacketTypeHeader.packetType));
   }
 }
 
@@ -438,27 +409,26 @@ void Controller::handleKeywordRegistration(){
              flag = 1;
              continue;
             } else {
-             Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
-                "Setting flag to 2!");
              flag = 2;
              break;
             }
            }
           }
           if(flag)
-            break;
+        	  break;
         }
         responsePacketHeader.len = 0;
         if (flag == 1) {
-         /* send ack */
-         /* Delete entry for uniqueId from uniqueIdToPublishers_ */
-         /* TBD:: Remove rules from switches for that UniqueId from the 
+        	/* send ack */
+        	/* Delete entry for uniqueId from uniqueIdToPublishers_ */
+        	/* TBD:: Remove rules from switches for that UniqueId from the
 						switches(Done)*/
-        if(uniqueIdToSubscribers_.find(uniqueId) 
-          != uniqueIdToSubscribers_.end()){ 
-          installRulesRegistration(responsePacketHeader.hostId,uniqueId,
-           UpdateType::DELETE_RULE);
-        }
+        	if(uniqueIdToSubscribers_.find(uniqueId)
+        			!= uniqueIdToSubscribers_.end()){
+        		installRulesRegistration(responsePacketHeader.hostId,uniqueId,
+        				UpdateType::DELETE_RULE);
+        	}
+
          uniqueIdToPublishers_.erase(uniqueId);
          replyPacketTypeHeader.packetType = PacketType::DEREGISTRATION_ACK;
          memcpy(responsePacket, &replyPacketTypeHeader, PACKET_HEADER_LEN);
@@ -631,16 +601,12 @@ void Controller::handleKeywordSubscription() {
          }
        }
      }else{
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-      "Setting flag to 2!"); 
       flag = 2;
       break;
      }
     }
     /* No intersection of UniqueId found, Send Nack */
-    if(common.empty()) {
-     Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
-          "Setting flag to 2!");
+    if(common.empty()){
      flag = 2;
     }
     /* Common Pub * UnPub - Finding Intersection of keywords  -- End */
@@ -867,17 +833,7 @@ void Controller::installRulesRegistration(unsigned int publisherId, unsigned int
 	char packet[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
   struct PacketTypeHeader header;
   struct RuleUpdatePacketHeader ruleUpdatePacketHeader;
-
-   /*Iterate through the subscribers and send rule uninstall updates to switches*/
-  for(auto entry1 : uniqueIdToSubscribers_){
-	  for(auto entry2 : entry1.second) {
-		  Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-				  "Controller::installRulesRegistration: uniqueId:  " +
-				  std::to_string(entry1.first) + " Subscriber is " +
-				  std::to_string(entry2));
-	  }
-  }
- 
+	
 	auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueId);
 	/* Predecessor map with key and value type of vertex_descriptor */
   std::vector<vertexDescriptor_> predecessor(boost::num_vertices(graph_));
@@ -898,14 +854,14 @@ void Controller::installRulesRegistration(unsigned int publisherId, unsigned int
 				std::to_string(predecessor[hostId]) +
 				" uniqueID= " + " " + std::to_string(uniqueId) +
 				" Next Hop= " + std::to_string(hostId));
-     
-    bzero(&header, PACKET_HEADER_LEN);
-    bzero(&ruleUpdatePacketHeader, RULE_UPDATE_HEADER_LEN);
-    bzero(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
-    header.packetType = PacketType::RULE;
-    memcpy(packet, &header, PACKET_HEADER_LEN);
-    
+
 			/* Prepare the rule update packet */
+			bzero(&header, PACKET_HEADER_LEN);
+			bzero(&ruleUpdatePacketHeader, RULE_UPDATE_HEADER_LEN);
+			bzero(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
+			header.packetType = PacketType::RULE;
+			memcpy(packet, &header, PACKET_HEADER_LEN);
+
 			ruleUpdatePacketHeader.type = type;
 			ruleUpdatePacketHeader.uniqueId = uniqueId;
 			ruleUpdatePacketHeader.nodeId = hostId;
@@ -918,8 +874,7 @@ void Controller::installRulesRegistration(unsigned int publisherId, unsigned int
         "cannot find packet engine for interface "
         + switchToIf_[predecessor[hostId]]);
 			}
-   sleep(1);
-			packetEngine->second.send(packet, RULE_UPDATE_HEADER_LEN);			
+			packetEngine->second.send(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);			
 		}
 	}
 }
@@ -935,6 +890,10 @@ void Controller::installRules(unsigned int destHost, unsigned int uniqueId,
   char packet[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
   struct PacketTypeHeader header;
   struct RuleUpdatePacketHeader ruleUpdatePacketHeader;
+  
+  /*bzero(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
+  header.packetType = PacketType::RULE;
+  memcpy(packet, &header, PACKET_HEADER_LEN);*/
   
   auto uniqueIdToPubsIterator = uniqueIdToPublishers_.find(uniqueId);
   
@@ -956,7 +915,7 @@ void Controller::installRules(unsigned int destHost, unsigned int uniqueId,
 				std::to_string(predecessor[hostId]) + "interface"+switchToIf_[predecessor[hostId]]+
 				" uniqueID= " + " " + std::to_string(uniqueId) +
 				" Next Hop= " + std::to_string(hostId));
-  
+
 			/* Prepare the rule update packet */
 			bzero(&header, PACKET_HEADER_LEN);
 			bzero(&ruleUpdatePacketHeader, RULE_UPDATE_HEADER_LEN);
@@ -977,8 +936,7 @@ void Controller::installRules(unsigned int destHost, unsigned int uniqueId,
         "cannot find packet engine for interface "
         + switchToIf_[predecessor[hostId]]);
 			}
-   sleep(1);
-			packetEngine->second.send(packet, RULE_UPDATE_HEADER_LEN);
+			packetEngine->second.send(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
 		}
 	}
 	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
@@ -1010,20 +968,4 @@ void Controller::startSniffing(std::string myInterface,
 
 unsigned int Controller::getId() const {
   return myId_; 
-}
-
-/*
- * Return the Unique Id to Publishers
- */
-std::unordered_map<unsigned int, std::set<unsigned int>> 
-  Controller::getUniqueIdToPublishers() const {
-    return uniqueIdToPublishers_;
-}
-
-/*
- * Return the Unique Id to subscribers
- */
-std::unordered_map<unsigned int, std::set<unsigned int>> 
-  Controller::getUniqueIdToSubscribers() const {
-    return uniqueIdToSubscribers_;
 }

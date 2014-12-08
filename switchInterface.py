@@ -55,7 +55,7 @@ def getForwardingTable(x, client):
     data = client.recv(1024);
     uidx = data.find(';')
     cidx = data.find(';', uidx + 1)
-    nidx = data.fine(';', cidx + 1)
+    nidx = data.find(';', cidx + 1)
     print data[:uidx], data[uidx + 1:cidx], data[cidx+1: nidx], data[nidx+1:]
     tmp = tmp + 1
 

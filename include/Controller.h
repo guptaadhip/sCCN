@@ -37,9 +37,6 @@ class Controller {
   /* TBD : Handle Keyword Subscription */
   void handleKeywordSubscription();
 
-  /* TBD: Handle Rule Response */
-  void handleRuleResponse();
-
   /* TBD : Handle Keyword Registration */
   void handleNetworkUpdate();
 
@@ -74,15 +71,7 @@ class Controller {
   std::unordered_map<unsigned int, std::set<unsigned int> > uniqueIdToPublishers_;
   /* Data Structure to store the uniqueId to list of subscribers */
   std::unordered_map<unsigned int, std::set<unsigned int> > uniqueIdToSubscribers_;
-  
-  /* Return the Unique Id to Subscribers*/
-  std::unordered_map<unsigned int, std::set<unsigned int>> 
-   getUniqueIdToSubscribers() const;
-  
-  /* Return the Unique Id to Publishers */
-  std::unordered_map<unsigned int, std::set<unsigned int>> 
-   getUniqueIdToPublishers() const;
-  
+
   /* 
    * Queues for the handler threads
    */
@@ -91,7 +80,6 @@ class Controller {
   Queue registrationQueue_;
   Queue subscriptionQueue_;
   Queue networkUpdateQueue_;
-  Queue ruleResponseQueue_;
   
   /*
    * Network Map
