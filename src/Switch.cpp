@@ -704,6 +704,13 @@ unsigned int Switch::getSwitchId() const {
 }
 
 /*
+ * Return node Id to interface map
+ */
+std::unordered_map<unsigned int, std::string> getnodeIdToIf() const {
+  return nodeIdToIf_;
+}
+
+/*
  * Return the switch forwarding table
  */
 std::unordered_map<unsigned int, struct HostIfCount> Switch::getForwardingTable() const {

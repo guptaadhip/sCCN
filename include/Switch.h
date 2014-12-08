@@ -99,6 +99,11 @@ class Switch{
    * Return the controller Interface
    */
   std::string getControllerIf() const;
+
+  /*
+   * Return nodeId to interface
+   */
+  std::unordered_map<unsigned int, std::string> getnodeIdToIf() const;
   
   /*
    * Returns the switch forwarding table

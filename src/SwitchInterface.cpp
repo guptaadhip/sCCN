@@ -120,8 +120,16 @@ void SwitchInterface::sendForwardTable() {
   /* this needs to be optimized */
   for (auto entry : forwardingTable) {
     bzero(data, BUFLEN);
+    unsigned int nodeId = 0;
     /* this is required bcopy doesnt work well when copying int to a char * */
-    sprintf(data, "%u;%u;%s" , entry.first, entry.second.count, entry.second.interface.c_str());
+    for (auto nodeIdToIf : switch_->getNodeIdToIf()) {
+      if (nodeIdToIf.second.compare(entry.second.interface) == 0) {
+        nodeId = nodeIdToIf.first;
+        break;
+      }
+    }
+    sprintf(data, "%u;%u;%s;%u" , entry.first, entry.second.count, 
+            entry.second.interface.c_str(), nodeId);
     sendData(data, strlen(data));
     sleep(1);
   }

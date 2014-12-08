@@ -48,14 +48,15 @@ def getForwardingTable(x, client):
   if data == "0":
     print "No entries in the forwarding table"
     return
-  print "Unique Id", "Count", "Interface"
+  print "Unique Id", "Count", "Interface", "NextHop Id"
   tmp = 0
   count = int(data)
   while (tmp < count):
     data = client.recv(1024);
     uidx = data.find(';')
     cidx = data.find(';', uidx + 1)
-    print data[:uidx], data[uidx + 1:cidx], data[cidx + 1:]
+    nidx = data.fine(';', cidx + 1)
+    print data[:uidx], data[uidx + 1:cidx], data[cidx+1: nidx], data[nidx+1:]
     tmp = tmp + 1
 
 
