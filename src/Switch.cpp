@@ -706,7 +706,7 @@ unsigned int Switch::getSwitchId() const {
 /*
  * Return node Id to interface map
  */
-std::unordered_map<unsigned int, std::string> getnodeIdToIf() const {
+std::unordered_map<unsigned int, std::string> Switch::getNodeIdToIf() const {
   return nodeIdToIf_;
 }
 

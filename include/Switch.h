@@ -103,7 +103,7 @@ class Switch{
   /*
    * Return nodeId to interface
    */
-  std::unordered_map<unsigned int, std::string> getnodeIdToIf() const;
+  std::unordered_map<unsigned int, std::string> getNodeIdToIf() const;
   
   /*
    * Returns the switch forwarding table
