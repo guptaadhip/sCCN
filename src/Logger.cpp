@@ -17,5 +17,7 @@ void Logger::log(Log logType, std::string fileName,
   } else if (logType == Log::WARN) {
     std::cout << "WARN: " << fileName << ": " << function << "::" 
               << line << ": " << msg << std::endl;
+  } else {
+    std::cout << "INFO: " << msg << std::endl;
   }
 }
