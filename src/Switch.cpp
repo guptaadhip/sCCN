@@ -153,6 +153,12 @@ void Switch::handleHostRegistration() {
       connectedHostList_.push_back(regRequest.nodeId);
       nodeIdToIf_.insert(std::pair<unsigned int, std::string> 
                           (regRequest.nodeId, pending->interface));
+      /* printing the nodeIdToIf_  map */
+      for(auto &entry : nodeIdToIf_) {
+       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+        "nodeIdToIf_ -> nodeID : "
+        + std::to_string(entry.first) + " Interface : " + entry.second);
+      }
       sendNetworkUpdate(UpdateType::ADD_HOST, regRequest.nodeId);
     }
     /*  
@@ -200,7 +206,7 @@ void Switch::handleRuleUpdate() {
       continue;
     }
     Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-                  "got a packet for rule update");
+                  "Received a Rule update packet");
 
     /* parsing the incoming packet */
     RuleUpdatePacketHeader ruleHeader; 
@@ -224,12 +230,11 @@ void Switch::handleRuleUpdate() {
       	/* new rule request -> ADD it */
       	auto nodeToIfEntry = nodeIdToIf_.find(ruleHeader.nodeId);
       	if (nodeToIfEntry == nodeIdToIf_.end()) {
-      		Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+      		Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
       			"The node with nodeId = " + std::to_string(ruleHeader.nodeId) + 
             " is not connected to" + " switch = " + std::to_string(myId_));
       		/* Prepare NACK here */
       		header.packetType = PacketType::RULE_NACK;
-
       	} else {
       	  /* make a new entry and insert it */
       		HostIfCount hc;
@@ -237,16 +242,28 @@ void Switch::handleRuleUpdate() {
       	  hc.count = 1;
       	  forwardingTable_.insert(std::pair <unsigned int, struct HostIfCount> 
               (ruleHeader.uniqueId, hc));
-      	/* printing the printForwardingTable */
-      	printForwardingTable();
-          /* Prepare ACK here */
+         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+            "Added Rule:: Unique ID= "+std::to_string(ruleHeader.uniqueId)
+            + " Host Count = " + std::to_string(hc.count));
+         /* printing the printForwardingTable */
+         printForwardingTable();
+         
+         /* Prepare ACK here */
       	  header.packetType = PacketType::RULE_ACK;
       	}
       } else {
       	/* if the rule is present, just increment the count */
       	forwardingTable_[ruleHeader.uniqueId].count++;
+       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+           "Increment Counter - Added Rule:: Unique ID= " + 
+           std::to_string(ruleHeader.uniqueId)
+           + " Host Count = " + 
+           std::to_string(forwardingTable_[ruleHeader.uniqueId].count));
       	/* Prepare ACK here */
       	header.packetType = PacketType::RULE_ACK;
+       
+       /* printing the printForwardingTable */
+       printForwardingTable();
       }
 
       /* Response Packet Completed, now send it. */
@@ -260,6 +277,10 @@ void Switch::handleRuleUpdate() {
       	auto packetEngineIterator = ifToPacketEngine_.find(controllerIf_);
       	packetEngineIterator->second.send(responsePacket, 
       		PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
+       
+       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+      			"Sending Packet:: Type- " + 
+         std::to_string((unsigned int) header.packetType));
       }
     } else if ((int) ruleHeader.type == (int) UpdateType::DELETE_RULE) {
       /* delete rule to the forwarding table */
@@ -489,6 +510,12 @@ void Switch::handleHello() {
       sendNetworkUpdate(UpdateType::ADD_SWITCH, helloPacket.nodeId);
       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "New Switch found: " + std::to_string(helloPacket.nodeId));
+       /* printing the nodeIdToIf_  map */
+       for(auto &entry : nodeIdToIf_) {
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+        "nodeIdToIf_ -> nodeID : " + 
+         std::to_string(entry.first) + " Interface : " + entry.second);
+       }
     }
     
     //Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
