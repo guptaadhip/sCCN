@@ -115,6 +115,16 @@ void HostInterface::readSocket() {
         host_->queueKeywordUnsubscription(&pkt);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "received unsubscription request for: " + std::string(pkt.packet));
+      } else if (strncmp(command, "f", 1) == 0) {
+        bzero(pkt.packet, BUFLEN);
+        unsigned int len = 0;
+        bcopy(command + sizeof(char) + sizeof(unsigned int), &len, sizeof(unsigned int));
+        len += (2 * sizeof(unsigned int));
+        bcopy(command + sizeof(char), pkt.packet, len);
+        pkt.len = len;
+        host_->queueDataForSending(&pkt);
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                    "Sending data packet" + std::string(pkt.packet));
       } else {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "Invalid Command: " + std::string(command));
@@ -160,7 +170,7 @@ void HostInterface::sendPublishList() {
   /* this needs to be optimized */
   for (auto entry : publishingMap) {
     bzero(data, BUFLEN);
-    /* this is required bcopy doesnt work well when copying int to a char * */
+    /* this is required bcopy doesnt work well when copying int to a char */
     bcopy(entry.first.c_str(), data, entry.first.length());
     sprintf(data + entry.first.length(), "%u", entry.second);
     sendData(data, strlen(data));

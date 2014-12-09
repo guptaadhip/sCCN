@@ -49,6 +49,30 @@ def getKeywords():
     except KeyboardInterrupt, k:
       return 
 
+def dataEntry():
+  try:
+    x = raw_input("Enter Data > " )
+    x = x.strip()
+    return x, len(x)
+  except KeyboardInterrupt, k:
+    return
+
+def sendData(client):
+  global publishUidList
+  publishingList(client)
+  print publishUidList
+  x = raw_input( "\nEnter Unique Id to publish: " )
+  x = x.strip()
+  if "" != x:
+    if x not in publishUidList:
+      print "Invalid Unique Id"
+    else:
+      data, dataLen = dataEntry()
+      payload = "f" + struct.pack("I", int(x)) + struct.pack("I", int(dataLen)) + data
+      client.send(payload)
+  else:
+    print "Invalid Unique Id"
+
 def subscribeList(client):
   global subsList
   subsList = []
@@ -165,8 +189,7 @@ if os.path.exists( "/tmp/hostSocket" ):
           unsubscribe(client)
           continue
         elif "send data" == x:
-          data = sendData()
-          client.send(data)
+          sendData(client)
           continue
         elif "quit" == x:
           print "Shutting down."

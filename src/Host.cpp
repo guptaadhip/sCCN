@@ -54,7 +54,7 @@ Host::Host(int myId) {
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
 		((unsigned short) PacketType::HELLO, &helloQueue_));
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
-		((unsigned short) PacketType::DATA, &sendDataQueue_));
+		((unsigned short) PacketType::DATA, &recvDataQueue_));
 
   /* Control packet queue */
   packetTypeToQueue_.insert(std::pair<unsigned short, Queue *>  
@@ -673,10 +673,12 @@ void Host::handleControlResp() {
 * Handler for sending data packets. 
 */
 void Host::sendDataHandler() {
-	while(true) {
-		auto pending = sendDataQueue_.packet_in_queue_.exchange(0, 
+  /* first one needs to be removed */
+  (void) sendDataQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
+  while(true) {
+    auto pending = sendDataQueue_.packet_in_queue_.exchange(0, 
                                                     std::memory_order_consume);
-		if( !pending ) {
+    if( !pending ) {
       std::unique_lock<std::mutex> lock(sendDataQueue_.packet_ready_mutex_); 
       if( !sendDataQueue_.packet_in_queue_) {
         sendDataQueue_.packet_ready_.wait(lock);
@@ -697,7 +699,7 @@ void Host::sendDataHandler() {
     /* Data Packet Header filling up */ 
     struct DataPacketHeader dataPacketHeader;
     dataPacketHeader.sequenceNo = sequenceNumberGen();
-    bcopy(pending->packet, &dataPacketHeader.uniqueId, sizeof(unsigned int)); 
+    bcopy(pending->packet, &dataPacketHeader.uniqueId, sizeof(unsigned int));
     if(publisherKeywordData_.fetchKeyword(dataPacketHeader.uniqueId).compare("") == 0) {
     	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Keyword does not exist in publishing map");
