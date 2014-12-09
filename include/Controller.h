@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <set>
+#include <vector>
 #include <unordered_map>
 #include "net.h"
 #include "Queue.h"
@@ -73,7 +74,7 @@ class Controller {
   /* Data Structure to store the uniqueId to list of publishers */
   std::unordered_map<unsigned int, std::set<unsigned int> > uniqueIdToPublishers_;
   /* Data Structure to store the uniqueId to list of subscribers */
-  std::unordered_map<unsigned int, std::set<unsigned int> > uniqueIdToSubscribers_;
+  std::unordered_map<unsigned int, std::vector<unsigned int> > uniqueIdToSubscribers_;
 
   /* 
    * Queues for the handler threads

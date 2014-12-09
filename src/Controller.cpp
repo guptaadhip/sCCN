@@ -650,13 +650,13 @@ void Controller::handleKeywordSubscription() {
         auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueID);
         if(uniqueIdToSubsIterator != uniqueIdToSubscribers_.end()) {
          /* If  uniqueID already exists, insert subscriber into the set */
-         uniqueIdToSubscribers_[uniqueID].insert(requestPacketHeader.hostId);
+         uniqueIdToSubscribers_[uniqueID].push_back(requestPacketHeader.hostId);
         } else {
          /* If  uniqueID does not exists, insert uniqueID & subscriber into map */
-         std::set<unsigned int> subsHostIdSet;
-         subsHostIdSet.insert(subsHostIdSet.end(), requestPacketHeader.hostId);
+         std::vector<unsigned int> subsHostIdSet;
+         subsHostIdSet.push_back(requestPacketHeader.hostId);
          uniqueIdToSubscribers_.insert(std::pair<unsigned int,
-         std::set<unsigned int>> (uniqueID, subsHostIdSet));
+         std::vector<unsigned int>> (uniqueID, subsHostIdSet));
         }
         /* Find shortest path between all Pub to this Sub for each uniqueId
            And Install corresponding ADD rules on the switches */ 
@@ -716,7 +716,12 @@ void Controller::handleKeywordSubscription() {
         }else{
          /* Multiple Subscribers exists for that uniqueID, remove only 
           that Subscriber */
-         uniqueIdToSubsIterator->second.erase(requestPacketHeader.hostId);
+         auto subscriberIterator = std::find(
+          uniqueIdToSubsIterator->second.begin(), 
+           uniqueIdToSubsIterator->second.end(), requestPacketHeader.hostId);
+         if(subscriberIterator != uniqueIdToSubsIterator->second.end()){
+          uniqueIdToSubsIterator->second.erase(subscriberIterator);
+         }
         }
        }
        /* Find shortest path between all Pub to this Sub for each uniqueId
