@@ -917,7 +917,6 @@ void Controller::installRulesDynamicRegistration(unsigned int publisherId,
                   "cannot find packet engine for interface "
                   + switchToIf_[predecessor[hostId]]);
             }
-            sleep(1);
             packetEngine->second.send(packet,
                 PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
           }
@@ -975,7 +974,6 @@ void Controller::installRulesRegistration(unsigned int publisherId,
             "cannot find packet engine for interface "
             + switchToIf_[predecessor[hostId]]);
       }
-      usleep(300);
       packetEngine->second.send(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
     }
   }
@@ -1038,7 +1036,6 @@ void Controller::installRules(unsigned int destHost, unsigned int uniqueId,
             "cannot find packet engine for interface "
             + switchToIf_[predecessor[hostId]]);
       }
-      usleep(300);
       packetEngine->second.send(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
     }
   }
