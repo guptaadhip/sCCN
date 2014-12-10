@@ -3,7 +3,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
-#include <atomic>
+#include <queue>
 
 class Queue {
  public:
@@ -17,7 +17,7 @@ class Queue {
    */
   std::mutex packet_ready_mutex_;
   std::condition_variable packet_ready_;
-  std::atomic<PacketEntry *> packet_in_queue_;
+  std::queue<PacketEntry *> packet_in_queue_;
 };
 
 typedef std::unordered_map<unsigned short, Queue *> PacketTypeToQueue;

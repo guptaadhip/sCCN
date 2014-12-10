@@ -113,67 +113,63 @@ Switch::Switch(unsigned int myId) {
  * Handle Host Registration Request
  */
 void Switch::handleHostRegistration() {
-  /* first one needs to be removed */
-  (void) hostRegistrationReqQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
   while(true) {
-    auto pending = hostRegistrationReqQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock (
-                                hostRegistrationReqQueue_.packet_ready_mutex_); 
-      if( !hostRegistrationReqQueue_.packet_in_queue_) {
-        hostRegistrationReqQueue_.packet_ready_.wait(lock);
-      }
-      continue;
-    }
-    /* handle host registration */
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+    std::unique_lock<std::mutex> lock(hostRegistrationReqQueue_.packet_ready_mutex_);    
+    hostRegistrationReqQueue_.packet_ready_.wait(lock);
+
+    while (!hostRegistrationReqQueue_.packet_in_queue_.empty()) {
+      auto pending = hostRegistrationReqQueue_.packet_in_queue_.front();
+      hostRegistrationReqQueue_.packet_in_queue_.pop();
+      
+      /* handle host registration */
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "host Registration request received from "
                   + std::string(pending->interface));
-    if (pending->interface.compare(controllerIf_) == 0) {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+      if (pending->interface.compare(controllerIf_) == 0) {
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "got registration request from controller interface");
-      continue;
-    }
-    struct RegistrationPacketHeader regRequest;
-    bcopy(pending->packet + PACKET_HEADER_LEN, &regRequest, 
+        continue;
+      }
+
+      struct RegistrationPacketHeader regRequest;
+      bcopy(pending->packet + PACKET_HEADER_LEN, &regRequest, 
                                                       REGISTRATION_HEADER_LEN);
 
-    /* no duplicates should go in the vector */
-    if (std::find(nodeList_.begin(), nodeList_.end(), 
+      /* no duplicates should go in the vector */
+      if (std::find(nodeList_.begin(), nodeList_.end(), 
                    regRequest.nodeId) == nodeList_.end()) {
-      nodeList_.push_back(regRequest.nodeId);
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+        nodeList_.push_back(regRequest.nodeId);
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "New Host found: " + std::to_string(regRequest.nodeId));
-    }
-    /* store in the list of connected host list */
-    if (std::find(connectedHostList_.begin(), connectedHostList_.end(), 
+      }
+      /* store in the list of connected host list */
+      if (std::find(connectedHostList_.begin(), connectedHostList_.end(), 
                    regRequest.nodeId) == connectedHostList_.end()) {
-      connectedHostList_.push_back(regRequest.nodeId);
-      nodeIdToIf_.insert(std::pair<unsigned int, std::string> 
+        connectedHostList_.push_back(regRequest.nodeId);
+        nodeIdToIf_.insert(std::pair<unsigned int, std::string> 
                           (regRequest.nodeId, pending->interface));
-      sendNetworkUpdate(UpdateType::ADD_HOST, regRequest.nodeId);
-    }
-    /*  
-     * Send ACK back to the host
-     */
-    auto entry = ifToPacketEngine_.find(pending->interface);
-    if (entry == ifToPacketEngine_.end()) {
-      Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
+        sendNetworkUpdate(UpdateType::ADD_HOST, regRequest.nodeId);
+      }
+      /*  
+       * Send ACK back to the host
+      */
+      auto entry = ifToPacketEngine_.find(pending->interface);
+      if (entry == ifToPacketEngine_.end()) {
+        Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
                   "cannot find packet engine for interface "
                   + pending->interface);
-    }   
-    char packet[REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN];
-    PacketTypeHeader header;
-    header.packetType = PacketType::HOST_REGISTRATION_ACK;
-    RegistrationResponsePacketHeader respHeader;
-    respHeader.nodeId = myId_;
-    memcpy(packet, &header, PACKET_HEADER_LEN);
-    memcpy(packet + PACKET_HEADER_LEN, &respHeader, 
+      }   
+      char packet[REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN];
+      PacketTypeHeader header;
+      header.packetType = PacketType::HOST_REGISTRATION_ACK;
+      RegistrationResponsePacketHeader respHeader;
+      respHeader.nodeId = myId_;
+      memcpy(packet, &header, PACKET_HEADER_LEN);
+      memcpy(packet + PACKET_HEADER_LEN, &respHeader, 
                                     REGISTRATION_RESPONSE_HEADER_LEN);
-    int len = REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN;
-    entry->second.send(packet, len);
+      int len = REGISTRATION_RESPONSE_HEADER_LEN + PACKET_HEADER_LEN;
+      entry->second.send(packet, len);
+    }
   }
 }
 
@@ -182,117 +178,112 @@ void Switch::handleHostRegistration() {
  * Handle Rule update packet
  */
 void Switch::handleRuleUpdate() {
-  /* first one needs to be removed */
-  (void) ruleQueue_.packet_in_queue_.exchange(0, std::memory_order_consume);
   while(true) {
-    auto pending = ruleQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock (ruleQueue_.packet_ready_mutex_); 
-      if( !ruleQueue_.packet_in_queue_) {
-        ruleQueue_.packet_ready_.wait(lock);
-      }
-      continue;
-    }
-    if (pending->interface.compare(controllerIf_) != 0) {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+    std::unique_lock<std::mutex> lock(ruleQueue_.packet_ready_mutex_);    
+    ruleQueue_.packet_ready_.wait(lock);
+
+    while (!ruleQueue_.packet_in_queue_.empty()) {
+      auto pending = ruleQueue_.packet_in_queue_.front();
+      ruleQueue_.packet_in_queue_.pop();
+ 
+      if (pending->interface.compare(controllerIf_) != 0) {
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "incorrect interface for the rule update packet");
-      continue;
-    }
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+        continue;
+      }
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "got a packet for rule update");
 
-    /* parsing the incoming packet */
-    RuleUpdatePacketHeader ruleHeader; 
-    bcopy(pending->packet + PACKET_HEADER_LEN, &ruleHeader, 
+      /* parsing the incoming packet */
+      RuleUpdatePacketHeader ruleHeader; 
+      bcopy(pending->packet + PACKET_HEADER_LEN, &ruleHeader, 
         RULE_UPDATE_HEADER_LEN);
 
-    /* preparing the response packet */
-    char responsePacket[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
-    bzero(responsePacket, PACKET_HEADER_LEN + NETWORK_UPDATE_HEADER_LEN);
-    struct PacketTypeHeader header;
-    memcpy(responsePacket + PACKET_HEADER_LEN, &ruleHeader, 
+      /* preparing the response packet */
+      char responsePacket[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
+      bzero(responsePacket, PACKET_HEADER_LEN + NETWORK_UPDATE_HEADER_LEN);
+      struct PacketTypeHeader header;
+      memcpy(responsePacket + PACKET_HEADER_LEN, &ruleHeader, 
         RULE_UPDATE_HEADER_LEN);
 
-    if ((int) ruleHeader.type == (int) UpdateType::ADD_RULE) {
-      /* add rule to the forwarding table */
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+      if ((int) ruleHeader.type == (int) UpdateType::ADD_RULE) {
+        /* add rule to the forwarding table */
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "Got an ADD rule request from controller");
-      auto entry = forwardingTable_.find(ruleHeader.uniqueId);
-      /* if the rule is not present */
-      if (entry == forwardingTable_.end()) {
-      	/* new rule request -> ADD it */
-      	auto nodeToIfEntry = nodeIdToIf_.find(ruleHeader.nodeId);
-      	if (nodeToIfEntry == nodeIdToIf_.end()) {
-      		Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-      			"The node with nodeId = " + std::to_string(ruleHeader.nodeId) + 
-            " is not connected to" + " switch = " + std::to_string(myId_));
-      		/* Prepare NACK here */
-      		header.packetType = PacketType::RULE_NACK;
-
-      	} else {
-      	  /* make a new entry and insert it */
-      		HostIfCount hc;
-      	  hc.interface = nodeToIfEntry->second;
-      	  hc.count = 1;
-      	  forwardingTable_.insert(std::pair <unsigned int, struct HostIfCount> 
+        auto entry = forwardingTable_.find(ruleHeader.uniqueId);
+        /* if the rule is not present */
+        if (entry == forwardingTable_.end()) {
+          /* new rule request -> ADD it */
+          auto nodeToIfEntry = nodeIdToIf_.find(ruleHeader.nodeId);
+          if (nodeToIfEntry == nodeIdToIf_.end()) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "The node with nodeId = " + std::to_string(ruleHeader.nodeId) + 
+                " is not connected to" + " switch = " + std::to_string(myId_));
+            /* Prepare NACK here */
+            header.packetType = PacketType::RULE_NACK;
+          } else {
+            /* make a new entry and insert it */
+            HostIfCount hc;
+      	    hc.interface = nodeToIfEntry->second;
+      	    hc.count = 1;
+      	    forwardingTable_.insert(std::pair <unsigned int, struct HostIfCount> 
               (ruleHeader.uniqueId, hc));
-      	/* printing the printForwardingTable */
-      	printForwardingTable();
+      	    /* printing the printForwardingTable */
+      	    printForwardingTable();
+            /* Prepare ACK here */
+      	    header.packetType = PacketType::RULE_ACK;
+          }
+        } else {
+          /* if the rule is present, just increment the count */
+          forwardingTable_[ruleHeader.uniqueId].count++;
           /* Prepare ACK here */
-      	  header.packetType = PacketType::RULE_ACK;
-      	}
-      } else {
-      	/* if the rule is present, just increment the count */
-      	forwardingTable_[ruleHeader.uniqueId].count++;
-      	/* Prepare ACK here */
-      	header.packetType = PacketType::RULE_ACK;
-      }
+          header.packetType = PacketType::RULE_ACK;
+        }
 
-      /* Response Packet Completed, now send it. */
-      memcpy(responsePacket, &header, PACKET_HEADER_LEN);
+        /* Response Packet Completed, now send it. */
+        memcpy(responsePacket, &header, PACKET_HEADER_LEN);
 
-      /* check if the switch is registered */
-      if(!registered_) {
-      	Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+        /* check if the switch is registered */
+        if(!registered_) {
+          Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
                 "Switch is not registered with any controller");
-      } else {
-      	auto packetEngineIterator = ifToPacketEngine_.find(controllerIf_);
-      	packetEngineIterator->second.send(responsePacket, 
-      		PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
-      }
-    } else if ((int) ruleHeader.type == (int) UpdateType::DELETE_RULE) {
-      /* delete rule to the forwarding table */
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+        } else {
+          auto packetEngineIterator = ifToPacketEngine_.find(controllerIf_);
+          packetEngineIterator->second.send(responsePacket, 
+              PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
+        }
+      } else if ((int) ruleHeader.type == (int) UpdateType::DELETE_RULE) {
+        /* delete rule to the forwarding table */
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "Got a DELETE rule request from controller");
-      auto entry = forwardingTable_.find(ruleHeader.uniqueId);
+        auto entry = forwardingTable_.find(ruleHeader.uniqueId);
       
-      /* if the rule is not present */
-      if (entry != forwardingTable_.end()) {
-      	if(--forwardingTable_[ruleHeader.uniqueId].count == 0) {
-      		forwardingTable_.erase (ruleHeader.uniqueId);
-      /* printing the printForwardingTable */
+        /* if the rule is not present */
+        if (entry != forwardingTable_.end()) {
+          if(--forwardingTable_[ruleHeader.uniqueId].count == 0) {
+            forwardingTable_.erase (ruleHeader.uniqueId);
+            /* printing the printForwardingTable */
            	printForwardingTable();
-      	}
-      }
+          }
+        }
 
-      /* send a ACK here */
-      header.packetType = PacketType::RULE_ACK;
-      /* Response Packet Completed, now send it. */
-      memcpy(responsePacket, &header, PACKET_HEADER_LEN);
-      /* check if the switch is registered */
-      if(!registered_) {
-      	Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+        /* send a ACK here */
+        header.packetType = PacketType::RULE_ACK;
+        /* Response Packet Completed, now send it. */
+        memcpy(responsePacket, &header, PACKET_HEADER_LEN);
+        /* check if the switch is registered */
+        if(!registered_) {
+          Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
                 "Switch is not registered with any controller");
-      } else {
-      	auto packetEngineIterator = ifToPacketEngine_.find(controllerIf_);
-      	packetEngineIterator->second.send(responsePacket, 
+        } else {
+          auto packetEngineIterator = ifToPacketEngine_.find(controllerIf_);
+          packetEngineIterator->second.send(responsePacket, 
       		PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
-      }
-      
-    } else {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+        }
+      } else {
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                   "incorrect update type: " + (char) ruleHeader.type);
+      }
     }
   }
   printForwardingTable();
@@ -317,29 +308,26 @@ void Switch::printForwardingTable() {
  * Handle data packet forwarding
  */
 void Switch::handleData() {
-  /* first one needs to be removed */
-  (void) dataQueue_.packet_in_queue_.exchange(0, std::memory_order_consume);
   while(true) {
-    auto pending = dataQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock (dataQueue_.packet_ready_mutex_); 
-      if( !dataQueue_.packet_in_queue_) {
-        dataQueue_.packet_ready_.wait(lock);
-      }
-      continue;
-    }
-    DataPacketHeader dataHeader; 
-    bcopy(pending->packet + PACKET_HEADER_LEN, &dataHeader, DATA_HEADER_LEN);
-    auto entry = forwardingTable_.find(dataHeader.uniqueId);
-    auto packetEngine = ifToPacketEngine_.find(entry->second.interface);
-    if (packetEngine == ifToPacketEngine_.end()) {
-    	Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
+    std::unique_lock<std::mutex> lock(dataQueue_.packet_ready_mutex_);    
+    dataQueue_.packet_ready_.wait(lock);
+
+    while (!dataQueue_.packet_in_queue_.empty()) {
+      auto pending = dataQueue_.packet_in_queue_.front();
+      dataQueue_.packet_in_queue_.pop();
+      
+      DataPacketHeader dataHeader; 
+      bcopy(pending->packet + PACKET_HEADER_LEN, &dataHeader, DATA_HEADER_LEN);
+      auto entry = forwardingTable_.find(dataHeader.uniqueId);
+      auto packetEngine = ifToPacketEngine_.find(entry->second.interface);
+      if (packetEngine == ifToPacketEngine_.end()) {
+        Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
     		"Packet Engine not found for " + entry->second.interface);
         continue;
-    }
-    packetEngine->second.forward(pending->packet, 
+      }
+      packetEngine->second.forward(pending->packet, 
     	dataHeader.len + DATA_HEADER_LEN + PACKET_HEADER_LEN);
+    }
   }
 }
 
@@ -347,62 +335,57 @@ void Switch::handleData() {
  * Handle Control Response Packets from Controller
  */
 void Switch::handleControlResponse() {
-  /* first one needs to be removed */
-  (void) controlResponseQueue_.packet_in_queue_.exchange(0,
-                                                    std::memory_order_consume);
   while(true) {
-    auto pending = controlResponseQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock
-                                    (controlResponseQueue_.packet_ready_mutex_); 
-      if( !controlResponseQueue_.packet_in_queue_) {
-        controlResponseQueue_.packet_ready_.wait(lock);
-      }
-      continue;
-    }
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+    std::unique_lock<std::mutex> lock(controlResponseQueue_.packet_ready_mutex_);    
+    controlResponseQueue_.packet_ready_.wait(lock);
+
+    while (!controlResponseQueue_.packet_in_queue_.empty()) {
+      auto pending = controlResponseQueue_.packet_in_queue_.front();
+      controlResponseQueue_.packet_in_queue_.pop();
+      
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "Received Control Response packet from:" 
                 + pending->interface);
-    /* if no controller is attached just drop the control packets */
-    if (!registered_) {
-      continue;
-    }
-    /* if packet is not from the interface of the controller then drop it */
-    if (pending->interface.compare(controllerIf_) != 0) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+      /* if no controller is attached just drop the control packets */
+      if (!registered_) {
+        continue;
+      }
+      /* if packet is not from the interface of the controller then drop it */
+      if (pending->interface.compare(controllerIf_) != 0) {
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
                 "Got control response packet from the non controller interface:"
                 + pending->interface);
-      continue;
-    }
-    /* if all looks good lets forward the packet to the host */
-    struct ResponsePacketHeader respPacket;
-    bcopy(pending->packet + PACKET_HEADER_LEN, &respPacket,RESPONSE_HEADER_LEN);
-    /* If the nodeId is not in the list of known hosts then drop the packet */
-    if (std::find(connectedHostList_.begin(), connectedHostList_.end(), 
-                   respPacket.hostId) == connectedHostList_.end()) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+        continue;
+      }
+      /* if all looks good lets forward the packet to the host */
+      struct ResponsePacketHeader respPacket;
+      bcopy(pending->packet + PACKET_HEADER_LEN, &respPacket,RESPONSE_HEADER_LEN);
+      /* If the nodeId is not in the list of known hosts then drop the packet */
+      if (std::find(connectedHostList_.begin(), connectedHostList_.end(), 
+                 respPacket.hostId) == connectedHostList_.end()) {
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
                 "node id not found in the connectedHostlist: nodeId" 
                 + respPacket.hostId);
-      continue;
-    }
-    auto interface = nodeIdToIf_.find(respPacket.hostId);
-    /* no interface found to the node then lets drop the packet */
-    if (interface == nodeIdToIf_.end()) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+        continue;
+      }
+      auto interface = nodeIdToIf_.find(respPacket.hostId);
+      /* no interface found to the node then lets drop the packet */
+      if (interface == nodeIdToIf_.end()) {
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
                 "node id interface not found for host:" 
                 + respPacket.hostId);
-      continue;
-    }
-    auto entry = ifToPacketEngine_.find(interface->second);
-    if (entry == ifToPacketEngine_.end()) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+        continue;
+      }
+      auto entry = ifToPacketEngine_.find(interface->second);
+      if (entry == ifToPacketEngine_.end()) {
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
                 "node interface PacketEngine not found:" 
                 + interface->second);
-      continue;
-    }
-    entry->second.send(pending->packet, RESPONSE_HEADER_LEN 
+        continue;
+      }
+      entry->second.send(pending->packet, RESPONSE_HEADER_LEN 
                         + PACKET_HEADER_LEN + respPacket.len);
+    }
   }
 }
 
@@ -410,38 +393,33 @@ void Switch::handleControlResponse() {
  * Handle Control Packets from hosts
  */
 void Switch::handleControlRequest() {
-  /* first one needs to be removed */
-  (void) controlRequestQueue_.packet_in_queue_.exchange(0,
-                                                    std::memory_order_consume);
   while(true) {
-    auto pending = controlRequestQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock
-                                    (controlRequestQueue_.packet_ready_mutex_); 
-      if( !controlRequestQueue_.packet_in_queue_) {
-        controlRequestQueue_.packet_ready_.wait(lock);
-      }
-      continue;
-    }
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+    std::unique_lock<std::mutex> lock(controlRequestQueue_.packet_ready_mutex_);    
+    controlRequestQueue_.packet_ready_.wait(lock);
+
+    while (!controlRequestQueue_.packet_in_queue_.empty()) {
+      auto pending = controlRequestQueue_.packet_in_queue_.front();
+      controlRequestQueue_.packet_in_queue_.pop();
+      
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "Received Control Request packet from:" 
                 + pending->interface);
-    /* if no controller is attached just drop the control packets */
-    if (!registered_) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
+      /* if no controller is attached just drop the control packets */
+      if (!registered_) {
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__, 
                   "Not registered with any controller dropping packet");
-      continue;
-    }
-    struct RequestPacketHeader reqPacket;
-    bcopy(pending->packet + PACKET_HEADER_LEN, &reqPacket, REQUEST_HEADER_LEN);
-    auto entry = ifToPacketEngine_.find(controllerIf_);
-    if (entry == ifToPacketEngine_.end()) {
-      Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
+        continue;
+      }
+      struct RequestPacketHeader reqPacket;
+      bcopy(pending->packet + PACKET_HEADER_LEN, &reqPacket, REQUEST_HEADER_LEN);
+      auto entry = ifToPacketEngine_.find(controllerIf_);
+      if (entry == ifToPacketEngine_.end()) {
+        Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__, 
                   "Could not find the packetEngine for controller");
-    }
-    entry->second.send(pending->packet, reqPacket.len 
+      }
+      entry->second.send(pending->packet, reqPacket.len 
                           + REQUEST_HEADER_LEN + PACKET_HEADER_LEN);
+    } 
   }
 }
 
@@ -449,50 +427,46 @@ void Switch::handleControlRequest() {
  * Handle Hello message 
  */
 void Switch::handleHello() {
-  /* first one needs to be removed */
-  (void) helloQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-    auto pending = helloQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock(helloQueue_.packet_ready_mutex_);    
-      if( !helloQueue_.packet_in_queue_) {
-        helloQueue_.packet_ready_.wait(lock);
-      }
-      continue;
-    }
-    struct HelloPacketHeader helloPacket;
-    bcopy(pending->packet + PACKET_HEADER_LEN, &helloPacket, HELLO_HEADER_LEN);
-    /* Set true that a hello was received from switch */
-    nodeToHello_[helloPacket.nodeId] = true;
-    /* Set counter to 0 */
-    nodeToHelloCount_[helloPacket.nodeId] = 0;
-    /* no duplicates should go in the vector */
-    if (std::find(nodeList_.begin(), nodeList_.end(), 
+    std::unique_lock<std::mutex> lock(helloQueue_.packet_ready_mutex_);    
+    helloQueue_.packet_ready_.wait(lock);
+
+    while (!helloQueue_.packet_in_queue_.empty()) {
+      auto pending = helloQueue_.packet_in_queue_.front();
+      helloQueue_.packet_in_queue_.pop(); 
+      
+      struct HelloPacketHeader helloPacket;
+      bcopy(pending->packet + PACKET_HEADER_LEN, &helloPacket, HELLO_HEADER_LEN);
+      /* Set true that a hello was received from switch */
+      nodeToHello_[helloPacket.nodeId] = true;
+      /* Set counter to 0 */
+      nodeToHelloCount_[helloPacket.nodeId] = 0;
+      /* no duplicates should go in the vector */
+      if (std::find(nodeList_.begin(), nodeList_.end(), 
                    helloPacket.nodeId) == nodeList_.end()) {
-      nodeList_.push_back(helloPacket.nodeId);
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+        nodeList_.push_back(helloPacket.nodeId);
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "New Node found: " + std::to_string(helloPacket.nodeId));
-    }
-    /* controller and host then continue as already added in the lists */
-    if (helloPacket.nodeId == myController_ || 
+      }
+      /* controller and host then continue as already added in the lists */
+      if (helloPacket.nodeId == myController_ || 
         std::find(connectedHostList_.begin(), connectedHostList_.end(),
           helloPacket.nodeId) != connectedHostList_.end()) {
-      continue;
-    }  
-    /* no duplicates should go in the list of connected switches */
-    if (std::find(connectedSwitchList_.begin(), connectedSwitchList_.end(),
+        continue;
+      }  
+      /* no duplicates should go in the list of connected switches */
+      if (std::find(connectedSwitchList_.begin(), connectedSwitchList_.end(),
                   helloPacket.nodeId) == connectedSwitchList_.end()) {
-      connectedSwitchList_.push_back(helloPacket.nodeId);
-      nodeIdToIf_.insert(std::pair<unsigned int, std::string> 
+        connectedSwitchList_.push_back(helloPacket.nodeId);
+        nodeIdToIf_.insert(std::pair<unsigned int, std::string> 
                           (helloPacket.nodeId, pending->interface));
-      sendNetworkUpdate(UpdateType::ADD_SWITCH, helloPacket.nodeId);
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+        sendNetworkUpdate(UpdateType::ADD_SWITCH, helloPacket.nodeId);
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
                 "New Switch found: " + std::to_string(helloPacket.nodeId));
+      }
+      //Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+      //            "Received hello from: " + std::to_string(helloPacket.nodeId));
     }
-    
-    //Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-    //            "Received hello from: " + std::to_string(helloPacket.nodeId));
   }
 }
 
@@ -594,40 +568,37 @@ void Switch::sendAllNetworkUpdate() {
 }
 
 void Switch::handleRegistrationResp() {
-  /* first one needs to be removed */
-  (void) switchRegRespQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-    auto pending = switchRegRespQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock(switchRegRespQueue_.packet_ready_mutex_);    
-      if( !switchRegRespQueue_.packet_in_queue_) {
-        switchRegRespQueue_.packet_ready_.wait(lock);
-      }   
-      continue;
-    }   
-    struct RegistrationPacketHeader regResponse;
-    bcopy(pending->packet + PACKET_HEADER_LEN, &regResponse, 
-                                      REGISTRATION_RESPONSE_HEADER_LEN);
-    myController_ = regResponse.nodeId;
-    controllerIf_ = pending->interface;
-    registered_ = true;
-    /* no duplicates should go in the vector */
-    if (std::find(nodeList_.begin(), nodeList_.end(), 
-                   regResponse.nodeId) == nodeList_.end()) {
-      nodeList_.push_back(regResponse.nodeId);
-    }
-    /* make sure this is not in the host or switch list */
-    connectedSwitchList_.erase(std::remove(connectedSwitchList_.begin(),
-            connectedSwitchList_.end(), myController_), connectedSwitchList_.end());
-    connectedHostList_.erase(std::remove(connectedHostList_.begin(),
-            connectedHostList_.end(), myController_), connectedHostList_.end());
+    std::unique_lock<std::mutex> lock(switchRegRespQueue_.packet_ready_mutex_);    
+    switchRegRespQueue_.packet_ready_.wait(lock);
 
-    /* if the controller has just been connected send all the network updates */
-    sendAllNetworkUpdate();
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+    while (!switchRegRespQueue_.packet_in_queue_.empty()) {
+      auto pending = switchRegRespQueue_.packet_in_queue_.front();
+      switchRegRespQueue_.packet_in_queue_.pop();
+      
+      struct RegistrationPacketHeader regResponse;
+      bcopy(pending->packet + PACKET_HEADER_LEN, &regResponse, 
+                                      REGISTRATION_RESPONSE_HEADER_LEN);
+      myController_ = regResponse.nodeId;
+      controllerIf_ = pending->interface;
+      registered_ = true;
+      /* no duplicates should go in the vector */
+      if (std::find(nodeList_.begin(), nodeList_.end(), 
+                   regResponse.nodeId) == nodeList_.end()) {
+        nodeList_.push_back(regResponse.nodeId);
+      }
+      /* make sure this is not in the host or switch list */
+      connectedSwitchList_.erase(std::remove(connectedSwitchList_.begin(),
+            connectedSwitchList_.end(), myController_), connectedSwitchList_.end());
+      connectedHostList_.erase(std::remove(connectedHostList_.begin(),
+            connectedHostList_.end(), myController_), connectedHostList_.end());
+      
+      /* if the controller has just been connected send all the network updates */
+      sendAllNetworkUpdate();
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                 "Registered with Controller: " + std::to_string(myController_)
                 + " at interface: " + pending->interface);
+    }
   }
 }
 

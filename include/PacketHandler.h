@@ -4,7 +4,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
-#include <atomic>
+#include <queue>
 
 class PacketHandler {
  public:
@@ -19,5 +19,5 @@ class PacketHandler {
  private:
   std::mutex packet_ready_mutex_;
   std::condition_variable packet_ready_;
-  std::atomic<PacketEntry *> packet_in_queue_;
+  std::queue<PacketEntry *> packet_in_queue_;
 };

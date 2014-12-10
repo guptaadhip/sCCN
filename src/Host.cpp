@@ -154,54 +154,51 @@ void Host::queueDataForReceiving(PacketEntry *t) {
  * Keyword deregistration handler
  */
 void Host::keywordDeregistrationHandler() {
-  (void) deregisterQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-    auto pending = deregisterQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) {
-      std::unique_lock<std::mutex> lock(deregisterQueue_.packet_ready_mutex_); 
-      if( !deregisterQueue_.packet_in_queue_) {
-        deregisterQueue_.packet_ready_.wait(lock);
-      }   
-      continue;
-    }
+    std::unique_lock<std::mutex> lock(deregisterQueue_.packet_ready_mutex_); 
+    deregisterQueue_.packet_ready_.wait(lock);
 
-    if (!registered_) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+    while (!registerQueue_.packet_in_queue_.empty()) {
+      auto pending = deregisterQueue_.packet_in_queue_.front();
+      deregisterQueue_.packet_in_queue_.pop();
+
+      if (!registered_) {
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
                   "Cannot deregister keyword! No switch connected");
-      continue;
-    }
-    /* Send packet (with random number) to register the keyword */
-    char packet[BUFLEN];
-    bzero(packet, BUFLEN);
+        continue;
+      }
+      /* Send packet (with random number) to register the keyword */
+      char packet[BUFLEN];
+      bzero(packet, BUFLEN);
 
-    struct PacketTypeHeader header;
-    header.packetType = PacketType::DEREGISTRATION_REQ;
+      struct PacketTypeHeader header;
+      header.packetType = PacketType::DEREGISTRATION_REQ;
 
-    struct RequestPacketHeader requestPacketHeader;
-    requestPacketHeader.hostId = myId_;
-    requestPacketHeader.sequenceNo = sequenceNumberGen();
-    requestPacketHeader.len = sizeof(unsigned int);
+      struct RequestPacketHeader requestPacketHeader;
+      requestPacketHeader.hostId = myId_;
+      requestPacketHeader.sequenceNo = sequenceNumberGen();
+      requestPacketHeader.len = sizeof(unsigned int);
 
-    unsigned int k;
-    memcpy(&k, pending->packet, sizeof(unsigned int));
-    /* Store the SeqNo to Unique Id which is sent to be registered. */
-    std::pair<unsigned int, unsigned int> newPair
-        (requestPacketHeader.sequenceNo, k);
-    deRegAckNackBook_.insert(newPair);
+      unsigned int k;
+      memcpy(&k, pending->packet, sizeof(unsigned int));
+      /* Store the SeqNo to Unique Id which is sent to be registered. */
+      std::pair<unsigned int, unsigned int> newPair
+                                    (requestPacketHeader.sequenceNo, k);
+      deRegAckNackBook_.insert(newPair);
     
-    /* Copy data into the packet */
-    memcpy(packet, &header, PACKET_HEADER_LEN);
-    memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
+      /* Copy data into the packet */
+      memcpy(packet, &header, PACKET_HEADER_LEN);
+      memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
                                                           REQUEST_HEADER_LEN);
-    memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
+      memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
                                                           sizeof(unsigned int));
-    auto entry = ifToPacketEngine_.find(switchIf_);
-    entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
+      auto entry = ifToPacketEngine_.find(switchIf_);
+      entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
                                                         + sizeof(unsigned int));
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "sent deregistration request with seq no = " 
                   + std::to_string(requestPacketHeader.sequenceNo));
+    }
   }
 }
 
@@ -209,62 +206,57 @@ void Host::keywordDeregistrationHandler() {
  * Keyword registration handler
  */
 void Host::keywordRegistrationHandler() {
-
-  (void) registerQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-    auto pending = registerQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) {
-      std::unique_lock<std::mutex> lock(registerQueue_.packet_ready_mutex_); 
-      if( !registerQueue_.packet_in_queue_) {
-        registerQueue_.packet_ready_.wait(lock);
-      }   
-      continue;
-    }
+    std::unique_lock<std::mutex> lock(registerQueue_.packet_ready_mutex_); 
+    registerQueue_.packet_ready_.wait(lock);
 
-    if (!registered_) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+    while (!registerQueue_.packet_in_queue_.empty()) {
+      auto pending = registerQueue_.packet_in_queue_.front();
+      registerQueue_.packet_in_queue_.pop();
+
+      if (!registered_) {
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
                   "Cannot register as publisher! No switch connected");
-      continue;
-    }
+        continue;
+      }
 
-    auto keyword = std::string(pending->packet);
-    unsigned int keywordLength = pending->len;
-    /* Check if the keyword is already registered */
-    if(publisherKeywordData_.keywordExists(keyword)) {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      auto keyword = std::string(pending->packet);
+      unsigned int keywordLength = pending->len;
+      /* Check if the keyword is already registered */
+      if(publisherKeywordData_.keywordExists(keyword)) {
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Keyword already exists in publishing");
-      continue;
-    }
+        continue;
+      }
 
-    /* Send packet (with random number) to register the keyword */
-    char packet[BUFLEN];
-    bzero(packet, BUFLEN);
+      /* Send packet (with random number) to register the keyword */
+      char packet[BUFLEN];
+      bzero(packet, BUFLEN);
 
-    struct PacketTypeHeader header;
-    header.packetType = PacketType::REGISTRATION_REQ;
+      struct PacketTypeHeader header;
+      header.packetType = PacketType::REGISTRATION_REQ;
 
-    struct RequestPacketHeader requestPacketHeader;
-    requestPacketHeader.hostId = myId_;
-    requestPacketHeader.sequenceNo = sequenceNumberGen();
-    requestPacketHeader.len = keywordLength;
+      struct RequestPacketHeader requestPacketHeader;
+      requestPacketHeader.hostId = myId_;
+      requestPacketHeader.sequenceNo = sequenceNumberGen();
+      requestPacketHeader.len = keywordLength;
 
-    /* Store the sequence no to keyword for registration ACK-NACK handling */
-    std::pair<unsigned int, std::string> newPair(requestPacketHeader.sequenceNo,
+      /* Store the sequence no to keyword for registration ACK-NACK handling */
+      std::pair<unsigned int, std::string> newPair(requestPacketHeader.sequenceNo,
                                                                       keyword);
-    regAckNackBook_.insert(newPair);
-    /* Copy data into the packet */
-    memcpy(packet, &header, PACKET_HEADER_LEN);
-    memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
+      regAckNackBook_.insert(newPair);
+      /* Copy data into the packet */
+      memcpy(packet, &header, PACKET_HEADER_LEN);
+      memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
                                                           REQUEST_HEADER_LEN);
-	  memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
+	    memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
                                                                 keywordLength);
-    auto entry = ifToPacketEngine_.find(switchIf_);
-    entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
+      auto entry = ifToPacketEngine_.find(switchIf_);
+      entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
                                                               + keywordLength);
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "sent publish registration request for: " + keyword);
-
+    }
   }
 }
 
@@ -272,64 +264,54 @@ void Host::keywordRegistrationHandler() {
  * Keyword Subscription handler
  */
 void Host::keywordSubscriptionHandler() {
-
-  (void) subscriberQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-  	auto pending = subscriberQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) {
-      std::unique_lock<std::mutex> lock(subscriberQueue_.packet_ready_mutex_); 
-      if( !subscriberQueue_.packet_in_queue_) {
-        subscriberQueue_.packet_ready_.wait(lock);
-      }   
-      continue;
-    }
+    std::unique_lock<std::mutex> lock(subscriberQueue_.packet_ready_mutex_); 
+    subscriberQueue_.packet_ready_.wait(lock);
 
-    if (!registered_) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
-                  "Cannot register as subscriber! No switch connected");
-      continue;
-    }
+    while (!subscriberQueue_.packet_in_queue_.empty()) {
+      auto pending = subscriberQueue_.packet_in_queue_.front();
+      subscriberQueue_.packet_in_queue_.pop();
 
-    auto keyword = std::string(pending->packet);
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      auto keyword = std::string(pending->packet);
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Got keyword from interface : " + keyword);
-    unsigned int keywordLength = pending->len;
-    /* Check if the keyword is already subscribed. */
-	  if(subscriberKeywordData_.keywordExists(keyword)) {
-	  	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      unsigned int keywordLength = pending->len;
+      /* Check if the keyword is already subscribed. */
+	    if(subscriberKeywordData_.keywordExists(keyword)) {
+	  	  Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Keyword : " + keyword + " has already been subscribed");
-	  	continue;
-	  }
+	  	  continue;
+	    }
 
-	  /* Send packet (with random sequence number) to register the keyword */
-	  char packet[PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength];
-	  bzero(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength);
+	    /* Send packet (with random sequence number) to register the keyword */
+	    char packet[PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength];
+	    bzero(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength);
 
-	  struct PacketTypeHeader header;
-	  header.packetType = PacketType::SUBSCRIPTION_REQ;
+	    struct PacketTypeHeader header;
+	    header.packetType = PacketType::SUBSCRIPTION_REQ;
 
-	  struct RequestPacketHeader requestPacketHeader;
-	  requestPacketHeader.hostId = myId_;
-	  requestPacketHeader.sequenceNo = sequenceNumberGen();
-	  requestPacketHeader.len = keywordLength;
+	    struct RequestPacketHeader requestPacketHeader;
+	    requestPacketHeader.hostId = myId_;
+	    requestPacketHeader.sequenceNo = sequenceNumberGen();
+	    requestPacketHeader.len = keywordLength;
 
-	  /* Store the sequence no to keyword for subs ACK-NACK handling */
-    std::pair<unsigned int, std::string> newPair (requestPacketHeader.sequenceNo,
-    	keyword);
-    subsAckNackBook_.insert(newPair);
+	    /* Store the sequence no to keyword for subs ACK-NACK handling */
+      std::pair<unsigned int, std::string> newPair (requestPacketHeader.sequenceNo,
+    	                                              keyword);
+      subsAckNackBook_.insert(newPair);
 
-    /* Copy data into the packet */
-    memcpy(packet, &header, PACKET_HEADER_LEN);
-    memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
+      /* Copy data into the packet */
+      memcpy(packet, &header, PACKET_HEADER_LEN);
+      memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
                                                           REQUEST_HEADER_LEN);
-	  memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
+	    memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
                                                                 keywordLength);
-    auto entry = ifToPacketEngine_.find(switchIf_);
-    entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
+      auto entry = ifToPacketEngine_.find(switchIf_);
+      entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
                                                               + keywordLength);
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "sent subscription request for: " + keyword);
+    }
   }
 }
 
@@ -337,63 +319,59 @@ void Host::keywordSubscriptionHandler() {
  * Keyword Unsubscription handler
  */
 void Host::keywordUnsubscriptionHandler() {
-
-  (void) unsubscriberQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-  	auto pending = unsubscriberQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) {
-      std::unique_lock<std::mutex> lock(unsubscriberQueue_.packet_ready_mutex_); 
-      if( !unsubscriberQueue_.packet_in_queue_) {
-        unsubscriberQueue_.packet_ready_.wait(lock);
-      }   
-      continue;
-    }
+    std::unique_lock<std::mutex> lock(unsubscriberQueue_.packet_ready_mutex_); 
+    unsubscriberQueue_.packet_ready_.wait(lock);
 
-    if (!registered_) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+    while (!unsubscriberQueue_.packet_in_queue_.empty()) {
+      auto pending = unsubscriberQueue_.packet_in_queue_.front();
+      unsubscriberQueue_.packet_in_queue_.pop();
+
+      if (!registered_) {
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
                   "Cannot register as subscriber! No switch connected");
-      continue;
-    }
+        continue;
+      }
 
-    auto keyword = std::string(pending->packet);
-    unsigned int keywordLength = pending->len;
+      auto keyword = std::string(pending->packet);
+      unsigned int keywordLength = pending->len;
 
-    /* Check if the keyword is already subscribed. */
-	  if(!subscriberKeywordData_.keywordExists(keyword)) {
-	  	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      /* Check if the keyword is already subscribed. */
+	    if(!subscriberKeywordData_.keywordExists(keyword)) {
+	  	  Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Keyword : " + keyword + " has not been subscribed");
-	  	continue;
-	  }
+	  	  continue;
+	   }
 
-	  /* Send packet (with random sequence number) to register the keyword */
-	  char packet[PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength];
-	  bzero(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength);
+	    /* Send packet (with random sequence number) to register the keyword */
+	    char packet[PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength];
+	    bzero(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN + keywordLength);
 
-	  struct PacketTypeHeader header;
-	  header.packetType = PacketType::DESUBSCRIPTION_REQ;
+	    struct PacketTypeHeader header;
+	    header.packetType = PacketType::DESUBSCRIPTION_REQ;
 
-	  struct RequestPacketHeader requestPacketHeader;
-	  requestPacketHeader.hostId = myId_;
-	  requestPacketHeader.sequenceNo = sequenceNumberGen();
-	  requestPacketHeader.len = keywordLength;
+	    struct RequestPacketHeader requestPacketHeader;
+	    requestPacketHeader.hostId = myId_;
+	    requestPacketHeader.sequenceNo = sequenceNumberGen();
+	    requestPacketHeader.len = keywordLength;
 
-	  /* Store the sequence no to keyword for subs ACK-NACK handling */
-    std::pair<unsigned int, std::string> newPair (requestPacketHeader.sequenceNo,
-    	keyword);
-    unsubsAckNackBook_.insert(newPair);
+	    /* Store the sequence no to keyword for subs ACK-NACK handling */
+      std::pair<unsigned int, std::string> newPair (requestPacketHeader.sequenceNo,
+    	                                              keyword);
+      unsubsAckNackBook_.insert(newPair);
 
-    /* Copy data into the packet */
-    memcpy(packet, &header, PACKET_HEADER_LEN);
-    memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
+      /* Copy data into the packet */
+      memcpy(packet, &header, PACKET_HEADER_LEN);
+      memcpy(packet + PACKET_HEADER_LEN, &requestPacketHeader, 
                                                           REQUEST_HEADER_LEN);
-	  memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
+	    memcpy(packet + PACKET_HEADER_LEN + REQUEST_HEADER_LEN, pending->packet, 
                                                                 keywordLength);
-    auto entry = ifToPacketEngine_.find(switchIf_);
-    entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
+      auto entry = ifToPacketEngine_.find(switchIf_);
+      entry->second.send(packet, PACKET_HEADER_LEN + REQUEST_HEADER_LEN 
                                                               + keywordLength);
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "sent subscription request for: " + keyword);
+    }
   }
 }
 
@@ -422,48 +400,40 @@ void Host::switchStateHandler() {
  * Handle Hello message 
  */
 void Host::handleHello() {
-  /* first one needs to be removed */
-  (void) helloQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-    auto pending = helloQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) {
-      std::unique_lock<std::mutex> lock(helloQueue_.packet_ready_mutex_); 
-      if( !helloQueue_.packet_in_queue_) {
-        helloQueue_.packet_ready_.wait(lock);
-      }   
-      continue;
-    }   
-    struct HelloPacketHeader helloPacket;
-    bcopy(pending->packet + PACKET_HEADER_LEN, &helloPacket, HELLO_HEADER_LEN);
-    if (helloPacket.nodeId == mySwitch_) {
-      switchDownCount_ = 0;
+    std::unique_lock<std::mutex> lock(helloQueue_.packet_ready_mutex_); 
+    helloQueue_.packet_ready_.wait(lock);
+
+    while (!helloQueue_.packet_in_queue_.empty()) {
+      auto pending = helloQueue_.packet_in_queue_.front();
+      helloQueue_.packet_in_queue_.pop();
+      struct HelloPacketHeader helloPacket;
+      bcopy(pending->packet + PACKET_HEADER_LEN, &helloPacket, HELLO_HEADER_LEN);
+      if (helloPacket.nodeId == mySwitch_) {
+        switchDownCount_ = 0;
+      }
     }
   }
 }
 
 void Host::handleRegistrationResp() {
-  /* first one needs to be removed */
-  (void) hostRegRespQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-    auto pending = hostRegRespQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock(hostRegRespQueue_.packet_ready_mutex_);    
-      if( !hostRegRespQueue_.packet_in_queue_) {
-        hostRegRespQueue_.packet_ready_.wait(lock);
-      }   
-      continue;
-    }   
-    struct RegistrationPacketHeader regResponse;
-    bcopy(pending->packet + PACKET_HEADER_LEN, &regResponse, 
+    std::unique_lock<std::mutex> lock(hostRegRespQueue_.packet_ready_mutex_); 
+    hostRegRespQueue_.packet_ready_.wait(lock);
+
+    while (!hostRegRespQueue_.packet_in_queue_.empty()) {
+      auto pending = hostRegRespQueue_.packet_in_queue_.front();
+      hostRegRespQueue_.packet_in_queue_.pop();
+      struct RegistrationPacketHeader regResponse;
+      bcopy(pending->packet + PACKET_HEADER_LEN, &regResponse, 
                                       REGISTRATION_RESPONSE_HEADER_LEN);
-    mySwitch_ = regResponse.nodeId;
-    switchIf_ = pending->interface;
-    registered_ = true;
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      mySwitch_ = regResponse.nodeId;
+      switchIf_ = pending->interface;
+      registered_ = true;
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                 "Registered with Switch: " + std::to_string(mySwitch_)
                 + " at interface: " + pending->interface);
+    }
   }
 }
 
@@ -497,43 +467,38 @@ void Host::startSniffing(std::string, PacketEngine *packetEngine){
 }
 
 void Host::handleControlResp() {
-  /* first one needs to be removed */
-  (void) controlPacketQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-    auto pending = controlPacketQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) { 
-      std::unique_lock<std::mutex> lock(controlPacketQueue_.packet_ready_mutex_);    
-      if( !controlPacketQueue_.packet_in_queue_) {
-        controlPacketQueue_.packet_ready_.wait(lock);
-      }   
-      continue;
-    }
+    std::unique_lock<std::mutex> lock(controlPacketQueue_.packet_ready_mutex_); 
+    controlPacketQueue_.packet_ready_.wait(lock);
+
+    while (!controlPacketQueue_.packet_in_queue_.empty()) {
+      auto pending = controlPacketQueue_.packet_in_queue_.front();
+      controlPacketQueue_.packet_in_queue_.pop();
     
-    struct PacketTypeHeader packetTypeHeader;
-    bcopy(pending->packet, &packetTypeHeader,PACKET_HEADER_LEN);
+      struct PacketTypeHeader packetTypeHeader;
+      bcopy(pending->packet, &packetTypeHeader,PACKET_HEADER_LEN);
 
-    struct ResponsePacketHeader responsePacketHeader;
-    bcopy(pending->packet + PACKET_HEADER_LEN, &responsePacketHeader, RESPONSE_HEADER_LEN);
+      struct ResponsePacketHeader responsePacketHeader;
+      bcopy(pending->packet + PACKET_HEADER_LEN, &responsePacketHeader, RESPONSE_HEADER_LEN);
 
-    /* Check if destined for this Host and seqNo exists */
-    if(responsePacketHeader.hostId != myId_) {
-      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "got a control response");
-      continue;
-    }
+      /* Check if destined for this Host and seqNo exists */
+      if(responsePacketHeader.hostId != myId_) {
+        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, "got a control response");
+        continue;
+      }
   
-    /* if the response was for registration */
-    if (packetTypeHeader.packetType == PacketType::REGISTRATION_ACK ||
-        packetTypeHeader.packetType == PacketType::REGISTRATION_NACK) {
-        Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-		              "got registration response");
+      /* if the response was for registration */
+      if (packetTypeHeader.packetType == PacketType::REGISTRATION_ACK ||
+          packetTypeHeader.packetType == PacketType::REGISTRATION_NACK) {
+          Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+		                  "got registration response");
         
-        if(regAckNackBook_.count(responsePacketHeader.sequenceNo) <= 0) {
+          if(regAckNackBook_.count(responsePacketHeader.sequenceNo) <= 0) {
             Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
-            "Spurious Sequence no, not present in regAckNackBook_ map  = "
-            + std::to_string(responsePacketHeader.sequenceNo));
+                        "Spurious Sequence no, not present in regAckNackBook_ map  = "
+                        + std::to_string(responsePacketHeader.sequenceNo));
             continue;
-        }
+          }
 
         std::string keyword = regAckNackBook_[responsePacketHeader.sequenceNo];
         
@@ -556,8 +521,8 @@ void Host::handleControlResp() {
             "Got registration ack " + keyword + " " + std::to_string(uniqueId));
         publisherKeywordData_.addKeywordIDPair(keyword, uniqueId);
 
-    } else if (packetTypeHeader.packetType == PacketType::DEREGISTRATION_ACK ||
-              packetTypeHeader.packetType == PacketType::DEREGISTRATION_NACK) {
+      } else if (packetTypeHeader.packetType == PacketType::DEREGISTRATION_ACK ||
+                 packetTypeHeader.packetType == PacketType::DEREGISTRATION_NACK) {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                 "got deregistration response");
         
@@ -589,8 +554,8 @@ void Host::handleControlResp() {
                     "from publisher keyword map");
         }
 
-    } else if (packetTypeHeader.packetType == PacketType::SUBSCRIPTION_ACK ||
-              packetTypeHeader.packetType == PacketType::SUBSCRIPTION_NACK) { 
+      } else if (packetTypeHeader.packetType == PacketType::SUBSCRIPTION_ACK ||
+                 packetTypeHeader.packetType == PacketType::SUBSCRIPTION_NACK) { 
 	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
 		              "got subscription response");
 
@@ -631,8 +596,8 @@ void Host::handleControlResp() {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
             "Got subscription ack " + keyword);
 
-    } else if (packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_ACK ||
-              packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_NACK) { 
+      } else if (packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_ACK ||
+                packetTypeHeader.packetType == PacketType::DESUBSCRIPTION_NACK) { 
 	      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
 		              "got desubscription response");
 
@@ -664,6 +629,7 @@ void Host::handleControlResp() {
                     "Could not delete the keyword: " + unsubsKeyword +
                     "from publisher keyword map");
         }
+      }
     }
   }
 }
@@ -673,64 +639,59 @@ void Host::handleControlResp() {
 * Handler for sending data packets. 
 */
 void Host::sendDataHandler() {
-  /* first one needs to be removed */
-  (void) sendDataQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
   while(true) {
-    auto pending = sendDataQueue_.packet_in_queue_.exchange(0, 
-                                                    std::memory_order_consume);
-    if( !pending ) {
-      std::unique_lock<std::mutex> lock(sendDataQueue_.packet_ready_mutex_); 
-      if( !sendDataQueue_.packet_in_queue_) {
-        sendDataQueue_.packet_ready_.wait(lock);
-      }   
-      continue;
-    }
+    std::unique_lock<std::mutex> lock(sendDataQueue_.packet_ready_mutex_);    
+    sendDataQueue_.packet_ready_.wait(lock);
 
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+    while (!sendDataQueue_.packet_in_queue_.empty()) {
+      auto pending = sendDataQueue_.packet_in_queue_.front();
+      sendDataQueue_.packet_in_queue_.pop();
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Sending a data packet....");
 
-    /* Sanity check - to see if the switch is registered or not */
-    if (!registered_) {
-      Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
+      /* Sanity check - to see if the switch is registered or not */
+      if (!registered_) {
+        Logger::log(Log::WARN, __FILE__, __FUNCTION__, __LINE__,
                   "Cannot send data ! No switch connected");
-      continue;
-    }
+        continue;
+      }
 
-    /* Data Packet Header filling up */ 
-    struct DataPacketHeader dataPacketHeader;
-    dataPacketHeader.sequenceNo = sequenceNumberGen();
-    bcopy(pending->packet, &dataPacketHeader.uniqueId, sizeof(unsigned int));
-    if(publisherKeywordData_.fetchKeyword(dataPacketHeader.uniqueId).compare("") == 0) {
-    	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      /* Data Packet Header filling up */ 
+      struct DataPacketHeader dataPacketHeader;
+      dataPacketHeader.sequenceNo = sequenceNumberGen();
+      bcopy(pending->packet, &dataPacketHeader.uniqueId, sizeof(unsigned int));
+      if(publisherKeywordData_.fetchKeyword(dataPacketHeader.uniqueId).compare("") == 0) {
+    	  Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Keyword does not exist in publishing map");
-      continue;
-    }
-    bcopy(pending->packet + sizeof(unsigned int),
-    	 &dataPacketHeader.len, sizeof(unsigned int));
-    if(dataPacketHeader.len == 0) {
-    	Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+        continue;
+      }
+      bcopy(pending->packet + sizeof(unsigned int),
+    	      &dataPacketHeader.len, sizeof(unsigned int));
+      if(dataPacketHeader.len == 0) {
+    	  Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Data size = 0 ! Try sending data again");
-      continue;
-    }
+        continue;
+      }
 
-    char packet[BUFLEN];
-    bzero(packet, BUFLEN);
+      char packet[BUFLEN];
+      bzero(packet, BUFLEN);
 
-    /* putting the payload */
-    bcopy(pending->packet + (2 * sizeof(unsigned int)), 
-    	packet + PACKET_HEADER_LEN + DATA_HEADER_LEN, dataPacketHeader.len);
+      /* putting the payload */
+      bcopy(pending->packet + (2 * sizeof(unsigned int)), 
+    	      packet + PACKET_HEADER_LEN + DATA_HEADER_LEN, dataPacketHeader.len);
 
-    /* Packet Type Header filling up */
-    struct PacketTypeHeader header;
-	  header.packetType = PacketType::DATA;
+      /* Packet Type Header filling up */
+      struct PacketTypeHeader header;
+	    header.packetType = PacketType::DATA;
 
-    /* Copy everything into a packet and send it. */
-    memcpy(packet, &header, PACKET_HEADER_LEN);
-    memcpy(packet + PACKET_HEADER_LEN, &dataPacketHeader, DATA_HEADER_LEN);
-    auto entry = ifToPacketEngine_.find(switchIf_);
-    entry->second.send(packet, BUFLEN);
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      /* Copy everything into a packet and send it. */
+      memcpy(packet, &header, PACKET_HEADER_LEN);
+      memcpy(packet + PACKET_HEADER_LEN, &dataPacketHeader, DATA_HEADER_LEN);
+      auto entry = ifToPacketEngine_.find(switchIf_);
+      entry->second.send(packet, BUFLEN);
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Sent the data.");
+    }
   }
 }
 
@@ -738,31 +699,27 @@ void Host::sendDataHandler() {
 * Handle Incoming Data Packets
 */
 void Host::recvDataHandler() {
-	(void) recvDataQueue_.packet_in_queue_.exchange(0,std::memory_order_consume);
-	while(true) {
-		auto pending = recvDataQueue_.packet_in_queue_.exchange(0, 
-			std::memory_order_consume);
-		if( !pending ) { 
-			std::unique_lock<std::mutex> lock(recvDataQueue_.packet_ready_mutex_);    
-			if( !recvDataQueue_.packet_in_queue_) {
-				recvDataQueue_.packet_ready_.wait(lock);
-			}
-			continue;
-		}
+  while(true) {
+    std::unique_lock<std::mutex> lock(recvDataQueue_.packet_ready_mutex_);    
+    recvDataQueue_.packet_ready_.wait(lock);
 
-		Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+    while (!recvDataQueue_.packet_in_queue_.empty()) {
+      auto pending = recvDataQueue_.packet_in_queue_.front();
+      recvDataQueue_.packet_in_queue_.pop();
+		  Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Received a data packet....");
 
-		struct DataPacketHeader dataPacketHeader;
-		bcopy(pending->packet + PACKET_HEADER_LEN, &dataPacketHeader,
-				DATA_HEADER_LEN);
+		  struct DataPacketHeader dataPacketHeader;
+		  bcopy(pending->packet + PACKET_HEADER_LEN, &dataPacketHeader,
+				  DATA_HEADER_LEN);
 
-		char data[dataPacketHeader.len];
-		bcopy(pending->packet + PACKET_HEADER_LEN + DATA_HEADER_LEN, data,									
-		      dataPacketHeader.len);
+		  char data[dataPacketHeader.len];
+		  bcopy(pending->packet + PACKET_HEADER_LEN + DATA_HEADER_LEN, data,									
+		        dataPacketHeader.len);
 		
-    Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+      Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                   "Received Data : " + std::string(data));	
+    }
 	}
 }
 
