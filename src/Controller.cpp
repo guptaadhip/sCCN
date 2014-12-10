@@ -310,6 +310,7 @@ void Controller::handleKeywordRegistration(){
                                    (keywords, uniqueId));
         boost::split(keywordList, keywords, boost::is_any_of(";"));
         /* Updating the Map number 2 */
+        visitedSubscribers_.clear();
         for (auto item : keywordList) {
           /* If the entry for this single keyword exists
            *  in map number 2, then just update its set,
@@ -317,6 +318,8 @@ void Controller::handleKeywordRegistration(){
            */
           auto keywordToUIdsIterator = keywordToUniqueIds_.find(item);
           if(keywordToUIdsIterator != keywordToUniqueIds_.end()) {
+            installRulesDynamicRegistration(responsePacketHeader.hostId, 
+             keywordToUIdsIterator, UpdateType::ADD_RULE, uniqueId);
             keywordToUniqueIds_[item].insert(uniqueId);
           } else {
             std::set<unsigned int> uniqueIdSet;
@@ -333,12 +336,12 @@ void Controller::handleKeywordRegistration(){
         /* reply with the existing unique id */
         bcopy(&found->second, responsePacket + PACKET_HEADER_LEN +
               RESPONSE_HEADER_LEN, sizeof(unsigned int));
-				/* TBD: If new publisher for existing keyword comes up and
-				*  subscriber count not zero
-				* then install rules for all subscribers(Done)
-				*/
-				installRulesRegistration(responsePacketHeader.hostId,uniqueId,
-					UpdateType::ADD_RULE);
+        /* If new publisher for existing keyword comes up and
+        *  subscriber count not zero
+        *  then install rules for all subscribers(Done)
+        */
+        installRulesRegistration(responsePacketHeader.hostId,uniqueId,
+         UpdateType::ADD_RULE);
       }
       /* Updating the map of UniqueID to publishers */
       auto uniqueIdToPubsIterator = uniqueIdToPublishers_.find(uniqueId);
@@ -433,8 +436,7 @@ void Controller::handleKeywordRegistration(){
         if (flag == 1) {
         	/* send ack */
         	/* Delete entry for uniqueId from uniqueIdToPublishers_ */
-        	/* TBD:: Remove rules from switches for that UniqueId from the
-						switches(Done)*/
+        	/* Remove rules from switches for that UniqueId from the switches */
         	if(uniqueIdToSubscribers_.find(uniqueId)
         			!= uniqueIdToSubscribers_.end()){
         		installRulesRegistration(responsePacketHeader.hostId,uniqueId,
@@ -646,7 +648,7 @@ void Controller::handleKeywordSubscription() {
       memcpy(responsePacket + PACKET_HEADER_LEN, &responsePacketHeader,
         RESPONSE_HEADER_LEN);
       for(auto uniqueID : common) {
-       /* Updating the map of UniqueID to Subscriber */
+        /* Updating the map of UniqueID to Subscriber */
         auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueID);
         if(uniqueIdToSubsIterator != uniqueIdToSubscribers_.end()) {
          /* If  uniqueID already exists, insert subscriber into the set */
@@ -855,10 +857,93 @@ void Controller::handleNetworkUpdate() {
   }
 }
 
-void Controller::installRulesRegistration(unsigned int publisherId, unsigned int uniqueId, 
-  UpdateType type){
-	
-	char packet[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
+/* 
+* Install/Uninstall Rules on the Switches during Dynamic registration 
+*/
+void Controller::installRulesDynamicRegistration(unsigned int publisherId, 
+  std::unordered_map<std::string, std::set<unsigned int>>::iterator 
+  keywordToUIdsIterator, UpdateType type, unsigned int newUniqueId){
+  
+  char packet[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
+  struct PacketTypeHeader header;
+  struct RuleUpdatePacketHeader ruleUpdatePacketHeader;
+  
+  for (auto uniqueId : keywordToUIdsIterator->second){
+   auto uniqueIdToSubsIterator = uniqueIdToSubscribers_.find(uniqueId);
+   if(uniqueIdToSubsIterator != uniqueIdToSubscribers_.end()){
+    for(auto subscriber : uniqueIdToSubsIterator->second){
+     if(visitedSubscribers_.find(subscriber) == visitedSubscribers_.end()){
+       visitedSubscribers_.insert(subscriber);
+      
+       /* Predecessor map with key and value type of vertex_descriptor */
+       std::vector<vertexDescriptor_> predecessor(boost::num_vertices(graph_));
+       std::vector<int> distance(boost::num_vertices(graph_));
+       /* dijkstra_shortest_paths- Compute shortest paths */
+       boost::dijkstra_shortest_paths(graph_, publisherId,
+       boost::predecessor_map(&predecessor[0]).distance_map(&distance[0]));
+       
+       /* Updating the map of newUniqueId to Subscriber */
+       auto newUniqueIdToSubsIterator = uniqueIdToSubscribers_.find(newUniqueId);
+       if(newUniqueIdToSubsIterator != uniqueIdToSubscribers_.end()) {
+         /* If  newUniqueId already exists, insert subscriber into the set */
+         uniqueIdToSubscribers_[newUniqueId].push_back(subscriber);
+        } else {
+         /* If  newUniqueId does not exists, insert newUniqueId 
+         *   & subscriber into map 
+         */
+         std::vector<unsigned int> subsHostIdSet;
+         subsHostIdSet.push_back(subscriber);
+         uniqueIdToSubscribers_.insert(std::pair<unsigned int,
+           std::vector<unsigned int>> (newUniqueId, subsHostIdSet));
+        }
+        
+       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+        "Controller::  rules for Subscriber= " + std::to_string(subscriber));
+       
+       for (unsigned int hostId = subscriber; predecessor[hostId] != publisherId;
+         hostId = predecessor[hostId]) {
+         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+         "Sending Rule Update Packet On Switch= " +
+         std::to_string(predecessor[hostId]) +
+         " uniqueID= " + " " + std::to_string(newUniqueId) +
+         " Next Hop= " + std::to_string(hostId));
+
+         /* Prepare the rule update packet */
+         bzero(&header, PACKET_HEADER_LEN);
+         bzero(&ruleUpdatePacketHeader, RULE_UPDATE_HEADER_LEN);
+         bzero(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
+         header.packetType = PacketType::RULE;
+         memcpy(packet, &header, PACKET_HEADER_LEN);
+
+         ruleUpdatePacketHeader.type = type;
+         ruleUpdatePacketHeader.uniqueId = newUniqueId;
+         ruleUpdatePacketHeader.nodeId = hostId;
+         
+         memcpy(packet + PACKET_HEADER_LEN, &ruleUpdatePacketHeader, 
+          RULE_UPDATE_HEADER_LEN);
+         
+         /* Prepare packetEngine and send */
+         auto packetEngine = 
+           ifToPacketEngine_.find(switchToIf_[predecessor[hostId]]);
+         if (packetEngine == ifToPacketEngine_.end()) {
+           Logger::log(Log::CRITICAL, __FILE__, __FUNCTION__, __LINE__,
+           "cannot find packet engine for interface "
+           + switchToIf_[predecessor[hostId]]);
+         }
+         sleep(1);
+         packetEngine->second.send(packet, 
+           PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);			
+       }
+     }
+    }
+   }
+  }
+}
+
+void Controller::installRulesRegistration(unsigned int publisherId, 
+  unsigned int uniqueId, UpdateType type){
+  
+  char packet[PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN];
   struct PacketTypeHeader header;
   struct RuleUpdatePacketHeader ruleUpdatePacketHeader;
 	
@@ -891,7 +976,8 @@ void Controller::installRulesRegistration(unsigned int publisherId, unsigned int
 			memcpy(packet, &header, PACKET_HEADER_LEN);
 
 			ruleUpdatePacketHeader.type = type;
-			ruleUpdatePacketHeader.uniqueId = uniqueId;
+   ruleUpdatePacketHeader.uniqueId = uniqueId;
+
 			ruleUpdatePacketHeader.nodeId = hostId;
 			memcpy(packet + PACKET_HEADER_LEN, &ruleUpdatePacketHeader, 
       RULE_UPDATE_HEADER_LEN);
@@ -902,7 +988,7 @@ void Controller::installRulesRegistration(unsigned int publisherId, unsigned int
         "cannot find packet engine for interface "
         + switchToIf_[predecessor[hostId]]);
 			}
-   //sleep(1);
+   usleep(300);
 			packetEngine->second.send(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);			
 		}
 	}
@@ -965,7 +1051,7 @@ void Controller::installRules(unsigned int destHost, unsigned int uniqueId,
         "cannot find packet engine for interface "
         + switchToIf_[predecessor[hostId]]);
 			}
-   //sleep(1);
+   usleep(300);
 			packetEngine->second.send(packet, PACKET_HEADER_LEN + RULE_UPDATE_HEADER_LEN);
 		}
 	}

@@ -47,6 +47,11 @@ class Controller {
 	/* Install/Uninstall Rules on the Switches during registration/dereg */
   void installRulesRegistration(unsigned int, unsigned int, UpdateType);
   
+  /* Install/Uninstall Rules on the Switches during Dynamic registration */
+  void installRulesDynamicRegistration(unsigned int, 
+  std::unordered_map<std::string, std::set<unsigned int>>::iterator, 
+   UpdateType, unsigned int);
+  
   /*Print map(keywordToUniqueIds_)*/
   void printMap(std::unordered_map<std::string, std::set<unsigned int>> input);
 
@@ -64,7 +69,8 @@ class Controller {
   std::unordered_map<std::string, unsigned int> ifToSwitch_;
   std::unordered_map<unsigned int, bool> switchToHello_;
   std::unordered_map <unsigned int, int> switchToHelloCount_;
-
+  std::set<unsigned int> visitedSubscribers_;
+  
   /* Data Structure to store the keywords to unique ID mapping */
   std::unordered_map<std::string, unsigned int> keywordsToUniqueId_;
   
