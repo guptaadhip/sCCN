@@ -340,8 +340,11 @@ void Controller::handleKeywordRegistration(){
         *  subscriber count not zero
         *  then install rules for all subscribers(Done)
         */
-        installRulesRegistration(responsePacketHeader.hostId,uniqueId,
-         UpdateType::ADD_RULE);
+        if(uniqueIdToSubscribers_.find(uniqueId)
+         != uniqueIdToSubscribers_.end()){
+         installRulesRegistration(responsePacketHeader.hostId,uniqueId,
+          UpdateType::ADD_RULE);
+        }
       }
       /* Updating the map of UniqueID to publishers */
       auto uniqueIdToPubsIterator = uniqueIdToPublishers_.find(uniqueId);
