@@ -158,7 +158,7 @@ void Host::keywordDeregistrationHandler() {
     std::unique_lock<std::mutex> lock(deregisterQueue_.packet_ready_mutex_); 
     deregisterQueue_.packet_ready_.wait(lock);
 
-    while (!registerQueue_.packet_in_queue_.empty()) {
+    while (!deregisterQueue_.packet_in_queue_.empty()) {
       auto pending = deregisterQueue_.packet_in_queue_.front();
       deregisterQueue_.packet_in_queue_.pop();
 

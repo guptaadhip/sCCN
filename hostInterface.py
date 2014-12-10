@@ -41,7 +41,7 @@ def getKeywords():
       if "q" == x:
         keywords.sort()
         strKeywords = ';'.join(keywords)
-        strKeywords += ';'
+        #strKeywords += ';'
         return strKeywords, len(strKeywords)
       keywords.append(x)
       count = count + 1
@@ -120,6 +120,7 @@ def unpublish(client):
       print "Invalid Unique Id"
     else:
       payload = "u" + struct.pack("I", int(x))
+      payload = payload.strip()
       client.send(payload)
   else:
     print "Invalid Unique Id"
@@ -139,8 +140,7 @@ def unsubscribe(client):
   if "" == keywords:
     print "No keywords founds"
     return
-  temp = keywords[:-1]
-  print temp
+  temp = keywords
   if temp not in subsList:
     print "Invalid Unique Id"
   else:

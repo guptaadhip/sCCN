@@ -147,9 +147,11 @@ void HostInterface::sendSubscribeList() {
   /* this needs to be optimized */
   for (auto entry : subscribeMap) {
     bzero(data, BUFLEN);
+    auto keyword = entry.first;
+    keyword.append(";");
     /* this is required bcopy doesnt work well when copying int to a char * */
-    bcopy(entry.first.c_str(), data, entry.first.length());
-    sprintf(data + entry.first.length(), "%u", entry.second.front());
+    bcopy(keyword.c_str(), data, keyword.length());
+    sprintf(data + keyword.length(), "%u", entry.second.front());
     sendData(data, strlen(data));
     sleep(1);
   }
@@ -170,9 +172,11 @@ void HostInterface::sendPublishList() {
   /* this needs to be optimized */
   for (auto entry : publishingMap) {
     bzero(data, BUFLEN);
+    auto keyword = entry.first;
+    keyword.append(";");
     /* this is required bcopy doesnt work well when copying int to a char */
-    bcopy(entry.first.c_str(), data, entry.first.length());
-    sprintf(data + entry.first.length(), "%u", entry.second);
+    bcopy(keyword.c_str(), data, keyword.length());
+    sprintf(data + keyword.length(), "%u", entry.second);
     sendData(data, strlen(data));
     sleep(1);
   }
