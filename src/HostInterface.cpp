@@ -17,7 +17,7 @@ HostInterface::HostInterface(Host *myHost) {
 }
 
 void HostInterface::readSocket() {
-  char command[BUFLEN];
+  char command[1700];
   struct sockaddr_un local, remote;
   socklen_t remoteLen;
   bzero(&local, sizeof(local));
@@ -64,7 +64,7 @@ void HostInterface::readSocket() {
     }
     while (!done) {
       bzero(command, sizeof(command));
-      rc = recv(cliSocket_, command, 1024, 0);
+      rc = recv(cliSocket_, command, 1700, 0);
       if (rc <= 0) {
         continue;
       }
@@ -95,6 +95,11 @@ void HostInterface::readSocket() {
         host_->queueKeywordDeregistration(&pkt);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
               "received unpublishing request for: " + std::to_string(uniqueId));
+      } else if (strcmp(command, "show packet received counter") == 0) {
+        char data[BUFLEN];
+        bzero(data, BUFLEN);
+        sprintf(data, "%u", host_->packetsReceived_);
+        sendData(data, strlen(data));
       } else if (strncmp(command, "s", 1) == 0) {
         bzero(pkt.packet, BUFLEN);
         unsigned int len = 0;
@@ -116,15 +121,61 @@ void HostInterface::readSocket() {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "received unsubscription request for: " + std::string(pkt.packet));
       } else if (strncmp(command, "f", 1) == 0) {
+        char data[BUFLEN]; 
+        bzero(data, BUFLEN);
+
+        unsigned int numberOfPackets = 0, lastPacketSize = 0;
+        //unsigned int uniqueId = 0;
+        bcopy(command + sizeof(char), &numberOfPackets, sizeof(unsigned int));
+        bcopy(command + sizeof(char) + sizeof(unsigned int),
+                &lastPacketSize, sizeof(unsigned int));
+        
+        /* Packet Type Header filling up */
+        struct PacketTypeHeader header;
+        header.packetType = PacketType::DATA;        
+        
+        /* Data Packet Header filling up */
+        struct DataPacketHeader dataPacketHeader;
+        dataPacketHeader.sequenceNo = 0;
+        bcopy(command + sizeof(char) + (2 * sizeof(unsigned int)), &dataPacketHeader.uniqueId, sizeof(unsigned int));
+        dataPacketHeader.len = BUFLEN - 14;
+        if(dataPacketHeader.len == 0) {
+            Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                    "Data size = 0 ! Try sending data again");
+            continue;
+        }
+  
+       /* Copy everything into a packet and send it. */
+       memcpy(data, &header, PACKET_HEADER_LEN);
+       memcpy(data + PACKET_HEADER_LEN, &dataPacketHeader, DATA_HEADER_LEN); 
+        
+       /* Filling in the payload */
+       bcopy(command + sizeof(char) + (3 * sizeof(unsigned int)),
+                data + PACKET_HEADER_LEN + DATA_HEADER_LEN, BUFLEN - 14);
+        
+       for(unsigned int i = 0; i < numberOfPackets; i++) {
+           host_->sendDataHandler(data, BUFLEN);
+       }
+       
+       /* Sending last packet now */
+       dataPacketHeader.len = lastPacketSize;
+       memcpy(data + PACKET_HEADER_LEN, &dataPacketHeader, DATA_HEADER_LEN); 
+       host_->sendDataHandler(data, lastPacketSize);
+       Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
+                    "data sent");  
+      } else if (strncmp(command, "d", 1) == 0) {
         bzero(pkt.packet, BUFLEN);
         unsigned int len = 0;
-        bcopy(command + sizeof(char) + sizeof(unsigned int), &len, sizeof(unsigned int));
-        len += (2 * sizeof(unsigned int));
-        bcopy(command + sizeof(char), pkt.packet, len);
+        bcopy(command + sizeof(char), &len, sizeof(unsigned int));
+        bcopy(command + sizeof(char) + sizeof(unsigned int), pkt.packet,
+              len * sizeof(char));
         pkt.len = len;
-        host_->queueDataForSending(&pkt);
+        host_->queueKeywordUnsubscription(&pkt);
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
-                    "Sending data packet" + std::string(pkt.packet));
+                    "received unsubscription request for: " + std::string(pkt.packet));
+
+      } else if (strcmp(command, "clear packet received counter") == 0) {
+        host_->packetsReceived_ = 0;
       } else {
         Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__,
                     "Invalid Command: " + std::string(command));

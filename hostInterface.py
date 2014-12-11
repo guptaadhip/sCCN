@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import signal, sys
+from random import choice
+from string import lowercase
+import math
 import socket
 import struct
 import os, os.path
@@ -28,6 +31,8 @@ def printHelp():
   print "\tunpublish"
   print "\tshow publish keyword list"
   print "\tshow subscribe keyword list"
+  print "\tshow packet received counter"
+  print "\tclear packet received counter"
   print "\tsend data"
 
 def getKeywords():
@@ -57,6 +62,35 @@ def dataEntry():
   except KeyboardInterrupt, k:
     return
 
+def getSize(dataLen):
+    x = raw_input("Amount of data> " )
+    x = x.strip()
+    data = x.split()
+    size = int(data[0])
+    if len(data) == 2:
+      unit = data[1]
+    else:
+      unit = ''
+    if unit == 'Mb' or unit == 'mb':
+      totalSize = size * 1024 * 1024
+    elif unit == 'Gb' or unit == 'gb':
+      totalSize = size * 1024 * 1024 * 1024
+    elif unit == 'Kb' or unit == 'kb':
+      totalSize = size * 1024
+    else:
+      # consider size in bytes
+      totalSize = size
+    #find the number of packets
+    count = totalSize / dataLen
+    count = int(math.floor(count))
+    lastSize = int(totalSize - (dataLen * count))
+    return count, lastSize
+
+def generateData():
+  n = 1470 - 14
+  data = "".join(choice(lowercase) for i in range(n))
+  return data, len(data)
+
 def sendData(client):
   global publishUidList
   publishingList(client)
@@ -67,9 +101,11 @@ def sendData(client):
     if x not in publishUidList:
       print "Invalid Unique Id"
     else:
-      data, dataLen = dataEntry()
-      payload = "f" + struct.pack("I", int(x)) + struct.pack("I", int(dataLen)) + data
-      client.send(payload)
+        data, dataLen = generateData()
+        count, lastSize = getSize(dataLen)
+        print count, lastSize
+        packet = "f" + struct.pack("I", count) + struct.pack("I", lastSize) + struct.pack("I", int(x)) + data
+        client.send(packet)
   else:
     print "Invalid Unique Id"
 
@@ -95,7 +131,7 @@ def publishingList(client):
   global publishUidList
   publishUidList = []
   client.send("show publish keyword list")
-  data = client.recv(1024)
+  data = client.recv(1500)
   if data == "0":
     print "Not publishing any keywords"
     return
@@ -103,7 +139,7 @@ def publishingList(client):
   tmp = 0
   count = int(data)
   while tmp < count:
-    data = client.recv(1024)
+    data = client.recv(1500)
     idx = data.rfind(';')
     publishUidList.append(str(data[idx + 1:]))
     print data[:idx] + "\t" + data[idx + 1:]
@@ -185,6 +221,14 @@ if os.path.exists( "/tmp/hostSocket" ):
         elif "subscribe" == x:
           subscribe(client)
           continue
+        elif "show packet received counter" == x:
+          client.send(x)
+          data = client.recv(1500)
+          print data
+          continue
+        elif "clear packet received counter" == x:
+          client.send(x)
+          continue
         elif "unsubscribe" == x:
           unsubscribe(client)
           continue
@@ -198,7 +242,7 @@ if os.path.exists( "/tmp/hostSocket" ):
         else:
           print "Invalid Command"
           continue
-        data = client.recv(1024);
+        data = client.recv(1500);
     except KeyboardInterrupt, k:
       print "Shutting down."
   client.close()

@@ -73,7 +73,7 @@ class Host {
   /*
    * Handler for sending data 
   */
-  void sendDataHandler();
+  void sendDataHandler(const char *data, unsigned int len);
 
   /*
    * Handler for receiving data 
@@ -89,6 +89,10 @@ class Host {
    * Send the subscription map
    */
   std::unordered_map<std::string, std::vector<unsigned int>> getSubscriptionMap();
+
+  void throughput();
+
+  unsigned int packetsReceived_;
  
   private:
   unsigned int myId_;
@@ -161,6 +165,7 @@ class Host {
 
   bool registered_;
 
+  unsigned int dataSize_;
   /*
    * Queues for the handler threads
   */
