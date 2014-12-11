@@ -710,8 +710,8 @@ void Host::throughput() {
     auto throughput = (data / duration.total_microseconds()) * 8;
     if (dataSize_ != 0) {
       Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__,
-              "Throughput (mbps): " + std::to_string(throughput)+
-              " Packets Received: " + std::to_string(packetsReceived_));
+              "Throughput (mbps): " + std::to_string(throughput));
+      /*" Packets Received: " + std::to_string(packetsReceived_));*/
     }
   }
 }
