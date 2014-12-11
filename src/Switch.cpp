@@ -292,7 +292,18 @@ void Switch::handleRuleUpdate() {
         auto entry = forwardingTable_.find(ruleHeader.uniqueId);
       
         /* if the rule is not present */
-        /* uncomment it !!!! */
+        if (entry != forwardingTable_.end()) {
+            auto elements = forwardingTable_.equal_range(ruleHeader.uniqueId);
+    
+            for (auto element = elements.first; element != elements.second; ++element) {
+                if (strcmp((element->second.interface).c_str(), (nodeIdToIf_[ruleHeader.nodeId]).c_str()) == 0) {
+                    if(--element->second.count == 0) {
+                        forwardingTable_.erase (element);
+                    }   
+                    break;
+                }   
+            }   
+        }
         /*if (entry != forwardingTable_.end()) {
           if(--forwardingTable_[ruleHeader.uniqueId].count == 0) {
             forwardingTable_.erase (ruleHeader.uniqueId);
