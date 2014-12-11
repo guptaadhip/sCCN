@@ -703,7 +703,7 @@ void Host::throughput() {
   while (true) {
     pt::ptime time_start(pt::microsec_clock::local_time());
     dataSize_ = 0;
-    sleep(1);
+    usleep(50000);
     unsigned int data = dataSize_;
     pt::ptime time_end(pt::microsec_clock::local_time());
     pt::time_duration duration(time_end - time_start);

@@ -108,7 +108,7 @@ class Switch{
   /*
    * Returns the switch forwarding table
    */
-  std::unordered_map<unsigned int, struct HostIfCount> getForwardingTable() const;
+  std::unordered_multimap<unsigned int, struct HostIfCount> getForwardingTable() const;
 
  private:
   std::unordered_map<std::string, PacketEngine> ifToPacketEngine_;
@@ -123,7 +123,7 @@ class Switch{
   std::vector<unsigned int> nodeList_;
   std::unordered_map<unsigned int, bool> nodeToHello_;
   std::unordered_map<unsigned int, int> nodeToHelloCount_;
-  std::unordered_map<unsigned int, struct HostIfCount> forwardingTable_;
+  std::unordered_multimap<unsigned int, struct HostIfCount> forwardingTable_;
   std::vector<unsigned int> connectedSwitchList_;
   std::vector<unsigned int> connectedHostList_;
   /* a map from unique ID of node (may be host or switch) to interface */

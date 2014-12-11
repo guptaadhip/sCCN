@@ -235,9 +235,42 @@ void Switch::handleRuleUpdate() {
           }
         } else {
           /* if the rule is present, just increment the count */
-          forwardingTable_[ruleHeader.uniqueId].count++;
-          /* Prepare ACK here */
-          header.packetType = PacketType::RULE_ACK;
+          auto elements = forwardingTable_.equal_range(ruleHeader.uniqueId);
+          bool flag = true;
+
+          for (auto element = elements.first; element != elements.second; ++element) {
+            if (strcmp((element->second.interface).c_str(), (nodeIdToIf_[ruleHeader.nodeId]).c_str()) == 0){
+              flag = false;
+              element->second.count++;
+              break;
+            } 
+          }
+
+          if(!flag) {
+            /* rule exists, sending ACK */
+            header.packetType = PacketType::RULE_ACK;
+          } else {
+            /* new rule request -> ADD it */
+            auto nodeToIfEntry = nodeIdToIf_.find(ruleHeader.nodeId);
+            if (nodeToIfEntry == nodeIdToIf_.end()) {
+              Logger::log(Log::DEBUG, __FILE__, __FUNCTION__, __LINE__, 
+                "The node with nodeId = " + std::to_string(ruleHeader.nodeId) + 
+                " is not connected to" + " switch = " + std::to_string(myId_));
+              /* Prepare NACK here */
+              header.packetType = PacketType::RULE_NACK;
+            } else {
+              /* insert a  new entry */
+              HostIfCount hc;
+              hc.interface = nodeToIfEntry->second;
+              hc.count = 1;
+              forwardingTable_.insert(std::pair <unsigned int, struct HostIfCount> 
+                  (ruleHeader.uniqueId, hc));
+              /* printing the printForwardingTable */
+              printForwardingTable();
+              /* Prepare ACK here */
+              header.packetType = PacketType::RULE_ACK;
+            }
+          }
         }
 
         /* Response Packet Completed, now send it. */
@@ -259,13 +292,13 @@ void Switch::handleRuleUpdate() {
         auto entry = forwardingTable_.find(ruleHeader.uniqueId);
       
         /* if the rule is not present */
-        if (entry != forwardingTable_.end()) {
+        /* uncomment it !!!! */
+        /*if (entry != forwardingTable_.end()) {
           if(--forwardingTable_[ruleHeader.uniqueId].count == 0) {
             forwardingTable_.erase (ruleHeader.uniqueId);
-            /* printing the printForwardingTable */
            	printForwardingTable();
           }
-        }
+        }*/
 
         /* send a ACK here */
         header.packetType = PacketType::RULE_ACK;
@@ -318,15 +351,19 @@ void Switch::handleData() {
       
       DataPacketHeader dataHeader; 
       bcopy(pending->packet + PACKET_HEADER_LEN, &dataHeader, DATA_HEADER_LEN);
-      auto entry = forwardingTable_.find(dataHeader.uniqueId);
-      auto packetEngine = ifToPacketEngine_.find(entry->second.interface);
-      if (packetEngine == ifToPacketEngine_.end()) {
-        Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
-    		"Packet Engine not found for " + entry->second.interface);
-        continue;
-      }
-      packetEngine->second.forward(pending->packet, 
-    	dataHeader.len + DATA_HEADER_LEN + PACKET_HEADER_LEN);
+      
+      auto elements = forwardingTable_.equal_range(dataHeader.uniqueId);
+
+      for (auto element = elements.first; element != elements.second; ++element) {
+        auto packetEngine = ifToPacketEngine_.find(element->second.interface);
+        if (packetEngine == ifToPacketEngine_.end()) {
+          Logger::log(Log::INFO, __FILE__, __FUNCTION__, __LINE__, 
+              "Packet Engine not found for " + element->second.interface);
+          continue;
+        }
+        packetEngine->second.forward(pending->packet, 
+    	  dataHeader.len + DATA_HEADER_LEN + PACKET_HEADER_LEN);
+      } 
     }
   }
 }
@@ -684,6 +721,6 @@ std::unordered_map<unsigned int, std::string> Switch::getNodeIdToIf() const {
 /*
  * Return the switch forwarding table
  */
-std::unordered_map<unsigned int, struct HostIfCount> Switch::getForwardingTable() const {
+std::unordered_multimap<unsigned int, struct HostIfCount> Switch::getForwardingTable() const {
   return forwardingTable_;
 }
